@@ -43,6 +43,7 @@ export default function StudentsManager({
   const [programFilter, setProgramFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
   const [genderFilter, setGenderFilter] = useState("all");
+  const [activeSubTab, setActiveSubTab] = useState<"verified" | "pending">("verified");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -241,8 +242,27 @@ export default function StudentsManager({
     }
   };
 
+  // Approve student handler
+  const handleApproveStudent = async (id: string, name: string) => {
+    try {
+      setIsLoading(true);
+      await dbService.approveStudent(id);
+      showToast(`Student record for "${name}" approved successfully.`);
+      await refreshDatabaseState();
+    } catch (err: any) {
+      showToast(`Approval failed: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Filter & Search computation
   const filteredStudents = students.filter(s => {
+    // Status check
+    const statusMatch = activeSubTab === "pending"
+      ? s.status === "pending"
+      : (!s.status || s.status === "approved");
+
     const nameMatch = `${s.first_name} ${s.surname}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       s.registration_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       s.program_name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -250,7 +270,7 @@ export default function StudentsManager({
     const yearMatch = yearFilter === "all" || s.academic_year === yearFilter;
     const gendMatch = genderFilter === "all" || s.gender.toUpperCase() === genderFilter.toUpperCase();
 
-    return nameMatch && progMatch && yearMatch && gendMatch;
+    return statusMatch && nameMatch && progMatch && yearMatch && gendMatch;
   });
 
   // Calculate stats
@@ -633,6 +653,33 @@ export default function StudentsManager({
 
       </div>
 
+      {/* SUB-TABS SELECTOR */}
+      <div className="flex border-b border-zinc-200 dark:border-zinc-800 my-2">
+        <button
+          onClick={() => { setActiveSubTab("verified"); setCurrentPage(1); }}
+          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            activeSubTab === "verified"
+              ? "border-emerald-600 text-emerald-700 dark:text-emerald-400 font-bold"
+              : "border-transparent text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+          }`}
+        >
+          Verified Student Directory ({students.filter(s => !s.status || s.status === "approved").length})
+        </button>
+        <button
+          onClick={() => { setActiveSubTab("pending"); setCurrentPage(1); }}
+          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+            activeSubTab === "pending"
+              ? "border-amber-500 text-amber-600 dark:text-amber-400 font-bold"
+              : "border-transparent text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+          }`}
+        >
+          <span>Pending Applications</span>
+          <span className="bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 font-bold text-[10px] px-2 py-0.5 rounded-full font-mono">
+            {students.filter(s => s.status === "pending").length}
+          </span>
+        </button>
+      </div>
+
       {/* REGISTERED STUDENTS TABLE LIST */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden" id="students_register_datatable">
         <div className="overflow-x-auto">
@@ -691,7 +738,16 @@ export default function StudentsManager({
                       {student.gender}
                     </td>
 
-                    <td className="px-5 py-3.5 text-right">
+                    <td className="px-5 py-3.5 text-right flex justify-end gap-1">
+                      {student.status === "pending" && (
+                        <button
+                          onClick={() => handleApproveStudent(student.id, `${student.first_name} ${student.surname}`)}
+                          className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-lg transition-colors cursor-pointer"
+                          title="Approve and Verify student"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDeleteStudent(student.id, `${student.first_name} ${student.surname}`)}
                         className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"

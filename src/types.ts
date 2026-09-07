@@ -21,7 +21,7 @@ export interface VoterRow {
   password?: string;
   created_at: string;
   is_blocked?: boolean;
-  role?: 'voter' | 'club_manager'; // can be regular voter or club_manager
+  role?: 'voter' | 'club_manager' | 'admin'; // can be regular voter, club_manager, or admin
 }
 
 export interface VoteRow {
@@ -86,4 +86,6 @@ export interface StudentRow {
   first_name: string;
   gender: string;
   uploaded_at: string;
+  email?: string;
+  status?: 'pending' | 'approved';
 }

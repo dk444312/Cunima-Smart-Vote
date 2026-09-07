@@ -248,7 +248,7 @@ export const dbService = {
     return getLocalTable<VoterRow>(VOTERS_KEY);
   },
 
-  async insertVoter(username: string, password?: string, role: 'voter' | 'club_manager' = 'voter'): Promise<VoterRow> {
+  async insertVoter(username: string, password?: string, role: 'voter' | 'club_manager' | 'admin' = 'voter'): Promise<VoterRow> {
     const id = "voter_" + Math.floor(Math.random() * 1000000).toString();
     const newVoter: VoterRow = {
       id,
@@ -690,7 +690,9 @@ export const dbService = {
           cum_number: newStudent.cum_number,
           surname: newStudent.surname,
           first_name: newStudent.first_name,
-          gender: newStudent.gender
+          gender: newStudent.gender,
+          email: newStudent.email || null,
+          status: newStudent.status || 'approved'
         })
         .select()
         .single();
@@ -720,6 +722,23 @@ export const dbService = {
     saveLocalTable(STUDENTS_KEY, local.filter(s => s.id !== id));
   },
 
+  async approveStudent(id: string): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase
+        .from("students")
+        .update({ status: 'approved' })
+        .eq("id", id);
+      if (error) throw error;
+      return;
+    }
+    const local = getLocalTable<StudentRow>(STUDENTS_KEY);
+    const idx = local.findIndex(s => s.id === id);
+    if (idx >= 0) {
+      local[idx].status = 'approved';
+      saveLocalTable(STUDENTS_KEY, local);
+    }
+  },
+
   async importStudentsBulk(students: Omit<StudentRow, 'id' | 'uploaded_at'>[]): Promise<void> {
     if (isSupabaseConfigured && supabase) {
       const insertPayload = students.map(s => ({
@@ -731,6 +750,8 @@ export const dbService = {
         surname: s.surname,
         first_name: s.first_name,
         gender: s.gender,
+        email: s.email || null,
+        status: s.status || 'approved',
         uploaded_at: new Date().toISOString()
       }));
 
@@ -747,7 +768,9 @@ export const dbService = {
       const row: StudentRow = {
         ...s,
         id: idx >= 0 ? local[idx].id : "stud_" + Math.floor(Math.random() * 1000000).toString(),
-        uploaded_at: new Date().toISOString()
+        uploaded_at: new Date().toISOString(),
+        email: s.email,
+        status: s.status || 'approved'
       };
       if (idx >= 0) {
         local[idx] = row;

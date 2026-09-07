@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { 
-  Menu, Info, Moon, Sun, LogOut, RefreshCw, Copy, TrendingUp, Award, ShieldCheck, Database, Users2, ShieldAlert, Vote
+  Menu, Info, Moon, Sun, LogOut, RefreshCw, Copy, TrendingUp, Award, ShieldCheck, Database, Users2, ShieldAlert, Vote, Check
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { dbService, isSupabaseConfigured, initializeDatabase, PREMADE_ADMIN, PREMADE_VOTER, PREMADE_MANAGER } from "./lib/supabase.ts";
@@ -39,6 +39,17 @@ export default function App() {
   const [updateComments, setUpdateComments] = useState<Record<string, UpdateCommentRow[]>>({});
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Google Student Registration Form States
+  const [pendingGoogleUser, setPendingGoogleUser] = useState<{ email: string; displayName: string; uid: string } | null>(null);
+  const [googleRegSuccess, setGoogleRegSuccess] = useState(false);
+  const [regFirstName, setRegFirstName] = useState("");
+  const [regSurname, setRegSurname] = useState("");
+  const [regNumber, setRegNumber] = useState("");
+  const [regProgram, setRegProgram] = useState("");
+  const [regYear, setRegYear] = useState("");
+  const [regCum, setRegCum] = useState("");
+  const [regGender, setRegGender] = useState("M");
 
   // Form states for Admin (passed down or handled centrally)
   const [newElectionTitle, setNewElectionTitle] = useState("");
@@ -198,6 +209,9 @@ export default function App() {
     try {
       setIsLoading(true);
       setLoginError("");
+      setGoogleRegSuccess(false);
+      setPendingGoogleUser(null);
+
       const user = await signInWithGoogle();
       if (!user) {
         throw new Error("Could not fetch user profile from Google Authentication.");
@@ -206,47 +220,128 @@ export default function App() {
       const email = user.email || "";
       const displayName = user.displayName || user.email?.split("@")[0] || "Student Voter";
 
-      // Determine Role based on User Profile / Email List
-      let finalRole: "admin" | "voter" | "club_manager" = "voter";
-      let matchedVoter = voters.find(v => v.username.toLowerCase() === email.toLowerCase());
+      // Strict Domain Check: Only @cunima.ac.mw Google emails are allowed
+      if (!email.toLowerCase().endsWith("@cunima.ac.mw")) {
+        setLoginError("Access Restricted: Only official @cunima.ac.mw student/staff Google accounts are allowed to authenticate.");
+        setIsLoading(false);
+        return;
+      }
 
-      // If email is desire.kandodo@cunima.ac.mw or contains admin, grant full admin access
-      if (
-        email.toLowerCase() === "desire.kandodo@cunima.ac.mw" || 
+      // Check if user is the administrator bypass
+      const isAdminEmail = 
         email.toLowerCase() === "admin@cunima.ac.mw" ||
-        email.toLowerCase().startsWith("admin.")
-      ) {
-        finalRole = "admin";
-      } else if (matchedVoter) {
-        finalRole = matchedVoter.role || "voter";
-        if (matchedVoter.is_blocked) {
+        email.toLowerCase().startsWith("admin.");
+
+      if (isAdminEmail) {
+        // Find or create admin voter row
+        let matchedVoter = voters.find(v => v.username.toLowerCase() === email.toLowerCase());
+        if (!matchedVoter) {
+          try {
+            matchedVoter = await dbService.insertVoter(email, "firebase_secret", "admin");
+            await refreshDatabaseState();
+          } catch (dbErr) {
+            console.error("Inserting admin voter matched:", dbErr);
+          }
+        }
+        const activeUser: LoggedInUser = {
+          id: matchedVoter?.id || user.uid,
+          username: email,
+          role: "admin"
+        };
+        setCurrentUser(activeUser);
+        localStorage.setItem("g_election_active_user", JSON.stringify(activeUser));
+        showToast(`Google Auth Success: Welcome back, Admin ${displayName}.`);
+        return;
+      }
+
+      // Check Student Register Database:
+      const matchedStudent = students.find(s => s.email?.toLowerCase() === email.toLowerCase());
+
+      if (matchedStudent) {
+        if (matchedStudent.status === "pending") {
+          setLoginError("Your registration application is currently pending administrator approval. Please wait.");
+          setIsLoading(false);
+          return;
+        }
+
+        // Student exists and is APPROVED! Let's connect them
+        let matchedVoter = voters.find(v => v.username.toLowerCase() === email.toLowerCase());
+        if (!matchedVoter) {
+          try {
+            // Auto-create voter account linked to student
+            matchedVoter = await dbService.insertVoter(email, "firebase_secret", "voter");
+            await refreshDatabaseState();
+          } catch (dbErr) {
+            console.error("Auto registration voter failed:", dbErr);
+          }
+        }
+
+        if (matchedVoter?.is_blocked) {
           setLoginError("This student account has been blocked by administrators.");
           setIsLoading(false);
           return;
         }
+
+        const activeUser: LoggedInUser = {
+          id: matchedVoter?.id || user.uid,
+          username: email,
+          role: matchedVoter?.role || "voter"
+        };
+
+        setCurrentUser(activeUser);
+        localStorage.setItem("g_election_active_user", JSON.stringify(activeUser));
+        showToast(`Google Auth Success: Connected to your student profile.`);
       } else {
-        // Automatically register the student as a voter in our database register if they aren't there yet
-        try {
-          const newVoter = await dbService.insertVoter(email, "firebase_secret", finalRole);
-          await refreshDatabaseState();
-          matchedVoter = newVoter;
-        } catch (dbErr) {
-          console.error("Auto registration synced but handled:", dbErr);
-        }
+        // NOT in database at all! Trigger Student Profile Registration form!
+        setPendingGoogleUser({ email, displayName, uid: user.uid });
+        showToast("Student record not found. Please submit your details for verification.");
       }
-
-      const activeUser: LoggedInUser = {
-        id: matchedVoter?.id || user.uid,
-        username: email,
-        role: finalRole
-      };
-
-      setCurrentUser(activeUser);
-      localStorage.setItem("g_election_active_user", JSON.stringify(activeUser));
-      showToast(`Google Auth Success: Welcome back, ${displayName}.`);
     } catch (err: any) {
       console.error("Google login failure:", err);
       setLoginError(err.message || "Google Sign-In was cancelled or failed.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingGoogleUser) return;
+
+    if (!regFirstName || !regSurname || !regNumber || !regProgram || !regYear || !regCum || !regGender) {
+      showToast("Please fill in all student profile registration fields.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await dbService.insertStudent({
+        first_name: regFirstName.trim(),
+        surname: regSurname.trim(),
+        registration_number: regNumber.trim(),
+        program_name: regProgram.trim(),
+        academic_year: regYear.trim(),
+        cum_number: regCum.trim(),
+        gender: regGender.trim(),
+        email: pendingGoogleUser.email,
+        status: "pending" // Needs to be approved by administrator!
+      });
+
+      // Reset fields
+      setRegFirstName("");
+      setRegSurname("");
+      setRegNumber("");
+      setRegProgram("");
+      setRegYear("");
+      setRegCum("");
+      setRegGender("M");
+
+      // Sync the states
+      await refreshDatabaseState();
+      setGoogleRegSuccess(true);
+      showToast("Your registration profile has been successfully submitted for administrator approval.");
+    } catch (err: any) {
+      showToast(`Registration failure: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -625,123 +720,279 @@ export default function App() {
         {!currentUser ? (
           /* ================== SIGN IN LAYOUT ================== */
           <main className="flex-1 flex flex-col items-center justify-center p-6 md:p-12 max-w-lg mx-auto w-full">
-            <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-2xl flex items-center justify-center text-blue-600 mx-auto">
-                  <ShieldCheck className="w-6 h-6" />
+            {googleRegSuccess ? (
+              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm space-y-6 text-center">
+                <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/40 rounded-full flex items-center justify-center text-emerald-600 mx-auto border border-emerald-100 dark:border-emerald-900/50">
+                  <Check className="w-8 h-8" />
                 </div>
-                <h2 className="text-2xl font-normal text-zinc-950 dark:text-zinc-50">Voter Authentication Desk</h2>
-                <p className="text-xs text-zinc-400 max-w-xs mx-auto">
-                  Insert your registered credentials card to access active elections and ballots
-                </p>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Profile Submitted!</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
+                    Thank you! Your verified CUNIMA student profile has been submitted to the platform administrator for approval.
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed font-semibold">
+                    Email address: <span className="font-mono text-blue-600 dark:text-blue-400">{pendingGoogleUser?.email}</span>
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 py-2 px-3 rounded-xl border border-amber-100 dark:border-amber-900/30 mt-4 text-[11px] font-medium leading-relaxed">
+                    Status: Pending Verification. You will be connected automatically once approved by the administrator.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setGoogleRegSuccess(false);
+                    setPendingGoogleUser(null);
+                    setLoginError("");
+                  }}
+                  className="w-full py-2.5 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white font-semibold text-xs rounded-full cursor-pointer hover:bg-zinc-800 transition-colors"
+                >
+                  Return to Sign In
+                </button>
               </div>
-
-              <form onSubmit={handleLogin} className="space-y-4">
-                {loginError && (
-                  <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-xs font-medium flex items-center gap-2 border border-red-200 dark:border-red-900/50">
-                    <ShieldAlert className="w-4 h-4 flex-shrink-0" />
-                    <span>{loginError}</span>
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-zinc-500">Username</label>
-                  <input 
-                    type="text"
-                    value={usernameInput}
-                    onChange={(e) => setUsernameInput(e.target.value)}
-                    placeholder="Enter your credential username"
-                    className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
-                    required
-                  />
+            ) : pendingGoogleUser ? (
+              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-5 animate-fadeIn" id="student_registration_form">
+                <div>
+                  <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">CUNIMA Student Registration</h3>
+                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                    Your Google account is authenticated, but your student record is not yet in the voter database. Please submit your registration details to the administrator.
+                  </p>
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-semibold text-zinc-500">Password</label>
+                <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-xl border border-blue-100 dark:border-blue-900/30 text-[11px] text-blue-800 dark:text-blue-300 font-mono break-all">
+                  Connected: {pendingGoogleUser.email}
+                </div>
+
+                <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">First Name</label>
+                      <input 
+                        type="text"
+                        value={regFirstName}
+                        onChange={(e) => setRegFirstName(e.target.value)}
+                        placeholder="e.g. Desire"
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Surname</label>
+                      <input 
+                        type="text"
+                        value={regSurname}
+                        onChange={(e) => setRegSurname(e.target.value)}
+                        placeholder="e.g. Kandodo"
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Registration ID</label>
+                      <input 
+                        type="text"
+                        value={regNumber}
+                        onChange={(e) => setRegNumber(e.target.value)}
+                        placeholder="e.g. REG/CS/2026/011"
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">CUM Number</label>
+                      <input 
+                        type="text"
+                        value={regCum}
+                        onChange={(e) => setRegCum(e.target.value)}
+                        placeholder="e.g. 3.75 or 76.5"
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Program Course</label>
+                    <input 
+                      type="text"
+                      value={regProgram}
+                      onChange={(e) => setRegProgram(e.target.value)}
+                      placeholder="e.g. BSc Computer Science"
+                      className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Academic Year</label>
+                      <input 
+                        type="text"
+                        value={regYear}
+                        onChange={(e) => setRegYear(e.target.value)}
+                        placeholder="e.g. 2026/2027"
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Gender</label>
+                      <select
+                        value={regGender}
+                        onChange={(e) => setRegGender(e.target.value)}
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                      >
+                        <option value="M">Male (M)</option>
+                        <option value="F">Female (F)</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-3">
                     <button
                       type="button"
-                      onClick={() => setIsPasswordVisible(!isPasswordVisible)}
-                      className="text-[11px] text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                      onClick={() => {
+                        setPendingGoogleUser(null);
+                        setLoginError("");
+                      }}
+                      className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-800 text-zinc-500 text-xs font-semibold rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-center"
                     >
-                      {isPasswordVisible ? "Hide plain secret" : "Show plain secret"}
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs rounded-full shadow-md shadow-blue-500/15 transition-colors cursor-pointer text-center"
+                    >
+                      {isLoading ? "Submitting..." : "Submit Registration"}
                     </button>
                   </div>
-                  <input 
-                    type={isPasswordVisible ? "text" : "password"}
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    placeholder="••••••••••••"
-                    className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
-                    required
-                  />
+                </form>
+              </div>
+            ) : (
+              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+                <div className="text-center space-y-2">
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-2xl flex items-center justify-center text-blue-600 mx-auto">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-2xl font-normal text-zinc-950 dark:text-zinc-50">CUNIMA Voter Portal</h2>
+                  <p className="text-xs text-zinc-400 max-w-xs mx-auto">
+                    Socrates campus elections portal. Sign in with your official university account to access active ballots.
+                  </p>
                 </div>
 
-                <button 
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-sm rounded-full shadow-md shadow-blue-500/10 transition-all active:scale-95 cursor-pointer"
-                >
-                  {isLoading ? "Validating Session..." : "Verify Identity"}
-                </button>
-              </form>
+                {/* GOOGLE SIGN IN - PRIMARY ENTRANCE */}
+                <div className="space-y-4">
+                  {loginError && (
+                    <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-xs font-medium flex items-center gap-2 border border-red-200 dark:border-red-900/50">
+                      <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+                      <span>{loginError}</span>
+                    </div>
+                  )}
 
-              <div className="relative flex items-center justify-center my-4">
-                <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
-                <span className="bg-white dark:bg-zinc-900 px-3 text-[10px] uppercase tracking-wider text-zinc-400 font-bold absolute font-mono">
-                  or authenticate with
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isLoading}
-                className="w-full py-2.5 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 text-zinc-700 dark:text-zinc-200 font-semibold text-sm rounded-full flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
-                id="btn_google_signin"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
-                </svg>
-                <span>Sign In with Google</span>
-              </button>
-
-              {/* SANDBOX PREMADE CREDS DECK */}
-              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block text-center font-mono">
-                  Sandbox Testing Credentials
-                </span>
-
-                <div className="grid grid-cols-3 gap-2 text-[11px] font-semibold text-zinc-500">
-                  <button 
-                    onClick={() => { setUsernameInput("admin"); setPasswordInput("admin"); }}
-                    className="p-2 bg-zinc-50 dark:bg-zinc-800/40 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl text-center border border-zinc-200/60 dark:border-zinc-800/60 transition-all cursor-pointer"
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    disabled={isLoading}
+                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-full flex items-center justify-center gap-2.5 shadow-lg shadow-blue-500/15 border-none transition-all active:scale-95 cursor-pointer"
+                    id="btn_google_signin"
                   >
-                    <span className="block text-zinc-800 dark:text-zinc-200 font-bold">Admin Panel</span>
-                    <span className="text-[10px] text-zinc-400 font-mono">admin / admin</span>
-                  </button>
-
-                  <button 
-                    onClick={() => { setUsernameInput("manager"); setPasswordInput("manager"); }}
-                    className="p-2 bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/50 dark:hover:bg-purple-900/20 rounded-xl text-center border border-purple-200/60 dark:border-purple-900/60 transition-all cursor-pointer text-purple-700 dark:text-purple-300"
-                  >
-                    <span className="block font-bold">Club Manager</span>
-                    <span className="text-[10px] text-purple-400 font-mono">manager / manager</span>
-                  </button>
-
-                  <button 
-                    onClick={() => { setUsernameInput("voter"); setPasswordInput("voter"); }}
-                    className="p-2 bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-100/50 dark:hover:bg-blue-900/20 rounded-xl text-center border border-blue-200/60 dark:border-blue-900/60 transition-all cursor-pointer text-blue-700 dark:text-blue-300"
-                  >
-                    <span className="block font-bold">Voter Card</span>
-                    <span className="text-[10px] text-blue-400 font-mono">voter / voter</span>
+                    <svg className="w-4 h-4 filter brightness-0 invert" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                    </svg>
+                    <span>Sign In with @cunima.ac.mw Google</span>
                   </button>
                 </div>
+
+                <div className="relative flex items-center justify-center my-4">
+                  <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
+                  <span className="bg-white dark:bg-zinc-900 px-3 text-[10px] uppercase tracking-wider text-zinc-400 font-bold absolute font-mono">
+                    or authenticate with credentials
+                  </span>
+                </div>
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-zinc-500">Username</label>
+                    <input 
+                      type="text"
+                      value={usernameInput}
+                      onChange={(e) => setUsernameInput(e.target.value)}
+                      placeholder="Enter your credential username"
+                      className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-semibold text-zinc-500">Password</label>
+                      <button
+                        type="button"
+                        onClick={() => setIsPasswordVisible(!isPasswordVisible)}
+                        className="text-[11px] text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                      >
+                        {isPasswordVisible ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                    <input 
+                      type={isPasswordVisible ? "text" : "password"}
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
+                      required
+                    />
+                  </div>
+
+                  <button 
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-2.5 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 font-semibold text-sm rounded-full transition-all active:scale-95 cursor-pointer"
+                  >
+                    {isLoading ? "Validating Session..." : "Verify Username & Password"}
+                  </button>
+                </form>
+
+                {/* SANDBOX PREMADE CREDS DECK */}
+                <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block text-center font-mono">
+                    Sandbox Testing Credentials
+                  </span>
+
+                  <div className="grid grid-cols-3 gap-2 text-[11px] font-semibold text-zinc-500">
+                    <button 
+                      onClick={() => { setUsernameInput("admin"); setPasswordInput("admin"); }}
+                      className="p-2 bg-zinc-50 dark:bg-zinc-800/40 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl text-center border border-zinc-200/60 dark:border-zinc-800/60 transition-all cursor-pointer"
+                    >
+                      <span className="block text-zinc-800 dark:text-zinc-200 font-bold">Admin Panel</span>
+                      <span className="text-[10px] text-zinc-400 font-mono">admin / admin</span>
+                    </button>
+
+                    <button 
+                      onClick={() => { setUsernameInput("manager"); setPasswordInput("manager"); }}
+                      className="p-2 bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/50 dark:hover:bg-purple-900/20 rounded-xl text-center border border-purple-200/60 dark:border-purple-900/60 transition-all cursor-pointer text-purple-700 dark:text-purple-300"
+                    >
+                      <span className="block font-bold">Club Manager</span>
+                      <span className="text-[10px] text-purple-400 font-mono">manager / manager</span>
+                    </button>
+
+                    <button 
+                      onClick={() => { setUsernameInput("voter"); setPasswordInput("voter"); }}
+                      className="p-2 bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-100/50 dark:hover:bg-blue-900/20 rounded-xl text-center border border-blue-200/60 dark:border-blue-900/60 transition-all cursor-pointer text-blue-700 dark:text-blue-300"
+                    >
+                      <span className="block font-bold">Voter Card</span>
+                      <span className="text-[10px] text-blue-400 font-mono">voter / voter</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </main>
         ) : (
           /* ================== LOGGED-IN MULTI-DASHBOARD VIEWS ================== */
@@ -948,6 +1199,7 @@ export default function App() {
                 /* ================== ROUTED GENERAL VOTER PORTAL ================== */
                 <VoterDashboard
                   currentUser={currentUser}
+                  students={students}
                   elections={elections}
                   votes={votes}
                   clubMembers={clubMembers}
