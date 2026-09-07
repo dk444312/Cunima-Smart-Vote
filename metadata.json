@@ -1,0 +1,6 @@
+{
+  "name": "Google Election UI",
+  "description": "A clean, blank Google-style user interface featuring a hamburger menu and an Election workspace.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
