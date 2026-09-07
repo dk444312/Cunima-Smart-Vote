@@ -257,18 +257,38 @@ export default function App() {
       // Check Student Register Database: Check full name and the email address name
       const matchedStudent = students.find(s => {
         // 1. Direct Email Match
-        if (s.email?.toLowerCase() === email.toLowerCase()) {
+        if (s.email?.toLowerCase().trim() === email.toLowerCase().trim()) {
           return true;
         }
 
         // 2. Parse local part of Google email (e.g., "desire.kandodo" from "desire.kandodo@cunima.ac.mw")
-        const emailLocalPart = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
-        const firstNameLower = s.first_name.toLowerCase().replace(/[^a-z0-9]/g, "");
-        const surnameLower = s.surname.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const emailLocalPart = email.split("@")[0].toLowerCase().trim();
+        
+        // Split by punctuation to get raw segments (e.g. ["desire", "kandodo"])
+        const emailParts = emailLocalPart.split(/[\._\-]/).filter(p => p.length > 0);
+        
+        const firstNameLower = s.first_name.toLowerCase().trim();
+        const surnameLower = s.surname.toLowerCase().trim();
 
-        // Match if email local part contains both first name and surname (e.g., "desire.kandodo" has both "desire" and "kandodo")
-        const matchesFullName = emailLocalPart.includes(firstNameLower) && emailLocalPart.includes(surnameLower);
-        return matchesFullName;
+        // Standardized concatenated matching (e.g., "desirekandodo" or "kandododesire")
+        const cleanLocalPart = emailLocalPart.replace(/[^a-z0-9]/g, "");
+        const cleanFirst = firstNameLower.replace(/[^a-z0-9]/g, "");
+        const cleanSurname = surnameLower.replace(/[^a-z0-9]/g, "");
+
+        const opt1 = cleanFirst + cleanSurname; // "desirekandodo"
+        const opt2 = cleanSurname + cleanFirst; // "kandododesire"
+
+        // Check if the clean local part exactly matches one of the full-name order options
+        if (cleanLocalPart === opt1 || cleanLocalPart === opt2) {
+          return true;
+        }
+
+        // Also check segment intersection (e.g., emailParts has both "desire" and "kandodo" in any order)
+        if (emailParts.includes(cleanFirst) && emailParts.includes(cleanSurname)) {
+          return true;
+        }
+
+        return false;
       });
 
       if (matchedStudent) {
