@@ -254,10 +254,34 @@ export default function App() {
         return;
       }
 
-      // Check Student Register Database:
-      const matchedStudent = students.find(s => s.email?.toLowerCase() === email.toLowerCase());
+      // Check Student Register Database: Check full name and the email address name
+      const matchedStudent = students.find(s => {
+        // 1. Direct Email Match
+        if (s.email?.toLowerCase() === email.toLowerCase()) {
+          return true;
+        }
+
+        // 2. Parse local part of Google email (e.g., "desire.kandodo" from "desire.kandodo@cunima.ac.mw")
+        const emailLocalPart = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+        const firstNameLower = s.first_name.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const surnameLower = s.surname.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+        // Match if email local part contains both first name and surname (e.g., "desire.kandodo" has both "desire" and "kandodo")
+        const matchesFullName = emailLocalPart.includes(firstNameLower) && emailLocalPart.includes(surnameLower);
+        return matchesFullName;
+      });
 
       if (matchedStudent) {
+        // Automatically save their Google email to their student record if it's not set
+        if (!matchedStudent.email || matchedStudent.email.toLowerCase() !== email.toLowerCase()) {
+          try {
+            await dbService.linkStudentEmail(matchedStudent.id, email);
+            await refreshDatabaseState();
+          } catch (linkErr) {
+            console.error("Auto linking Google email to student profile failed:", linkErr);
+          }
+        }
+
         if (matchedStudent.status === "pending") {
           setLoginError("Your registration application is currently pending administrator approval. Please wait.");
           setIsLoading(false);

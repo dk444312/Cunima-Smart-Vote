@@ -739,6 +739,23 @@ export const dbService = {
     }
   },
 
+  async linkStudentEmail(id: string, email: string): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase
+        .from("students")
+        .update({ email })
+        .eq("id", id);
+      if (error) throw error;
+      return;
+    }
+    const local = getLocalTable<StudentRow>(STUDENTS_KEY);
+    const idx = local.findIndex(s => s.id === id);
+    if (idx >= 0) {
+      local[idx].email = email;
+      saveLocalTable(STUDENTS_KEY, local);
+    }
+  },
+
   async importStudentsBulk(students: Omit<StudentRow, 'id' | 'uploaded_at'>[]): Promise<void> {
     if (isSupabaseConfigured && supabase) {
       const insertPayload = students.map(s => ({
