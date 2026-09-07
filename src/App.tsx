@@ -55,6 +55,10 @@ export default function App() {
   const [isSearchingProfile, setIsSearchingProfile] = useState(false);
   const [searchStateMessage, setSearchStateMessage] = useState("");
   const [currentUserDisplay, setCurrentUserDisplay] = useState("");
+  const [pendingIdentityConfirm, setPendingIdentityConfirm] = useState<{
+    student: StudentRow;
+    activeUser: LoggedInUser;
+  } | null>(null);
 
   // Form states for Admin (passed down or handled centrally)
   const [newElectionTitle, setNewElectionTitle] = useState("");
@@ -354,9 +358,12 @@ export default function App() {
           role: matchedVoter?.role || "voter"
         };
 
-        setCurrentUser(activeUser);
-        localStorage.setItem("g_election_active_user", JSON.stringify(activeUser));
-        showToast(`Google Auth Success: Connected to your student profile.`);
+        // Intercept immediate login to show identity confirmation details modal
+        setPendingIdentityConfirm({
+          student: matchedStudent,
+          activeUser
+        });
+        showToast("Profile Match Identified: Please confirm your identity.");
       } else {
         setSearchStateMessage("No matching student profile found in standard directory database. Redirecting to registration...");
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -939,6 +946,101 @@ export default function App() {
                     </button>
                   </div>
                 </form>
+              </div>
+            ) : pendingIdentityConfirm ? (
+              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+                <div className="text-center space-y-2 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-950/40 rounded-2xl flex items-center justify-center text-amber-600 mx-auto">
+                    <UserCheck className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">Confirm Your Identity</h2>
+                  <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                    Socrates matching engine found the following student profile connected to your Google credentials. Please verify details before exploring the portal.
+                  </p>
+                </div>
+
+                <div className="space-y-4 font-sans text-xs">
+                  <div className="grid grid-cols-2 gap-3.5">
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">First Name</span>
+                      <p className="font-semibold text-zinc-900 dark:text-zinc-50 text-sm">
+                        {pendingIdentityConfirm.student.first_name}
+                      </p>
+                    </div>
+
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Surname</span>
+                      <p className="font-semibold text-zinc-900 dark:text-zinc-50 text-sm">
+                        {pendingIdentityConfirm.student.surname}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3.5">
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Registration Number</span>
+                      <p className="font-semibold text-zinc-900 dark:text-zinc-50 font-mono text-[13px]">
+                        {pendingIdentityConfirm.student.registration_number}
+                      </p>
+                    </div>
+
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Academic Year</span>
+                      <p className="font-semibold text-zinc-900 dark:text-zinc-50 font-mono">
+                        {pendingIdentityConfirm.student.academic_year}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                    <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Registered Program Course</span>
+                    <p className="font-semibold text-zinc-900 dark:text-zinc-50">
+                      {pendingIdentityConfirm.student.program_name}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3.5">
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">CUM Number</span>
+                      <p className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-sm">
+                        {pendingIdentityConfirm.student.cum_number}
+                      </p>
+                    </div>
+
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Connected Google Account</span>
+                      <p className="font-semibold text-blue-600 dark:text-blue-400 font-mono truncate">
+                        {pendingIdentityConfirm.activeUser.username}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3.5 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingIdentityConfirm(null);
+                      showToast("Identity confirmation cancelled.");
+                    }}
+                    className="flex-1 py-3 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-semibold rounded-full transition-all active:scale-95 cursor-pointer text-center"
+                  >
+                    No, Disconnect Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const userObj = pendingIdentityConfirm.activeUser;
+                      setCurrentUser(userObj);
+                      localStorage.setItem("g_election_active_user", JSON.stringify(userObj));
+                      setPendingIdentityConfirm(null);
+                      showToast("Identity Confirmed: Welcome to Socrates Campus Portal.");
+                    }}
+                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-500/10 transition-all active:scale-95 cursor-pointer text-center"
+                  >
+                    Yes, Confirm & Explore
+                  </button>
+                </div>
               </div>
             ) : isSearchingProfile ? (
               <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm space-y-6 text-center">
