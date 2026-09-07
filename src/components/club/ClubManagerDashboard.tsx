@@ -23,6 +23,7 @@ interface ClubManagerDashboardProps {
   showToast: (msg: string) => void;
   isLoading: boolean;
   setIsLoading: (val: boolean) => void;
+  activeTab: string;
 }
 
 export default function ClubManagerDashboard({
@@ -43,11 +44,9 @@ export default function ClubManagerDashboard({
   refreshDatabaseState,
   showToast,
   isLoading,
-  setIsLoading
+  setIsLoading,
+  activeTab
 }: ClubManagerDashboardProps) {
-  // Tab control
-  const [activeTab, setActiveTab] = useState<"club_elections" | "club_members" | "feed" | "profile">("club_elections");
-
   // Election form state
   const [electionTitle, setElectionTitle] = useState("");
   const [electionDesc, setElectionDesc] = useState("");
@@ -202,7 +201,7 @@ export default function ClubManagerDashboard({
   return (
     <div className="space-y-6">
       {/* Header Summary */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl shadow-sm">
+      <div className="flex flex-col gap-4 items-start bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl shadow-sm">
         <div>
           <span className="text-xs font-bold tracking-wider text-purple-600 dark:text-purple-400 uppercase font-mono">
             Club Management Portal
@@ -213,41 +212,6 @@ export default function ClubManagerDashboard({
           <p className="text-xs text-zinc-500 mt-1">
             You are managing {managedClubs.length} {managedClubs.length === 1 ? "club" : "clubs"} assigned by administrators.
           </p>
-        </div>
-
-        <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl flex-wrap gap-1">
-          <button
-            onClick={() => setActiveTab("club_elections")}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-              activeTab === "club_elections" ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm" : "text-zinc-500"
-            }`}
-          >
-            My Club Elections
-          </button>
-          <button
-            onClick={() => setActiveTab("club_members")}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-              activeTab === "club_members" ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm" : "text-zinc-500"
-            }`}
-          >
-            Club Roster ({clubMembers.filter(cm => managedClubs.some(c => c.id === cm.club_id)).length})
-          </button>
-          <button
-            onClick={() => setActiveTab("feed")}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-              activeTab === "feed" ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm" : "text-zinc-500"
-            }`}
-          >
-            Elections Feed
-          </button>
-          <button
-            onClick={() => setActiveTab("profile")}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-              activeTab === "profile" ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm" : "text-zinc-500"
-            }`}
-          >
-            My Profile
-          </button>
         </div>
       </div>
 
@@ -349,7 +313,7 @@ export default function ClubManagerDashboard({
 
                   <button
                     type="submit"
-                    className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer"
+                    className="w-full py-2 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer"
                   >
                     Publish Club Election Row
                   </button>
@@ -615,7 +579,7 @@ export default function ClubManagerDashboard({
                 <div className="pt-2">
                   <button 
                     type="submit"
-                    className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
+                    className="w-full py-2.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
                   >
                     Update Credentials
                   </button>

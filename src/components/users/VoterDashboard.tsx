@@ -21,6 +21,7 @@ interface VoterDashboardProps {
   refreshDatabaseState: () => Promise<void>;
   showToast: (msg: string) => void;
   setIsLoading: (val: boolean) => void;
+  activeTab: string;
 }
 
 export default function VoterDashboard({
@@ -39,15 +40,16 @@ export default function VoterDashboard({
   handlePostComment,
   refreshDatabaseState,
   showToast,
-  setIsLoading
+  setIsLoading,
+  activeTab
 }: VoterDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"ballot" | "results" | "updates" | "profile">("ballot");
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, string>>({});
 
   // Profile fields state
   const [profileUsername, setProfileUsername] = useState(currentUser.username);
   const [profilePassword, setProfilePassword] = useState("");
   const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
+  const [profileGuardLocked, setProfileGuardLocked] = useState(!!currentUser.guard_locked);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
 
@@ -79,14 +81,29 @@ export default function VoterDashboard({
 
     try {
       setIsLoading(true);
-      const updateData: Partial<VoterRow> = { username: profileUsername };
+      const updateData: Partial<VoterRow> = { 
+        username: profileUsername,
+        guard_locked: profileGuardLocked
+      };
       if (profilePassword) {
         updateData.password = profilePassword;
       }
 
       await dbService.updateVoter(currentUser.id, updateData);
+      
+      // Synchronize active session storage state
+      const localS = localStorage.getItem("g_election_active_user");
+      if (localS) {
+        const parsed = JSON.parse(localS);
+        parsed.username = profileUsername;
+        parsed.guard_locked = profileGuardLocked;
+        localStorage.setItem("g_election_active_user", JSON.stringify(parsed));
+        currentUser.username = profileUsername;
+        currentUser.guard_locked = profileGuardLocked;
+      }
+
       showToast("Profile credentials updated successfully.");
-      setProfileMessage("Your credentials have been updated. Changes will apply immediately.");
+      setProfileMessage("Your credentials and Guard Lock status have been updated successfully.");
       setProfilePassword("");
       setProfileConfirmPassword("");
       await refreshDatabaseState();
@@ -104,49 +121,14 @@ export default function VoterDashboard({
     <div className="space-y-6">
       
       {/* Voter Header Panel */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+      <div className="flex flex-col gap-4 items-start bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
         <div>
-          <span className="text-xs font-bold tracking-wider text-[#1a73e8] dark:text-blue-400 uppercase font-mono">
+          <span className="text-xs font-bold tracking-wider text-[#0B1E40] dark:text-blue-400 uppercase font-mono">
             Official Voter Ballot Portal
           </span>
           <h2 className="text-2xl font-normal text-zinc-900 dark:text-zinc-50 mt-1">
             Welcome back, {currentUser.username}
           </h2>
-        </div>
-
-        <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl flex-wrap gap-1">
-          <button
-            onClick={() => setActiveTab("ballot")}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-              activeTab === "ballot" ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm" : "text-zinc-500"
-            }`}
-          >
-            My Ballots
-          </button>
-          <button
-            onClick={() => setActiveTab("results")}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-              activeTab === "results" ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm" : "text-zinc-500"
-            }`}
-          >
-            Election Results
-          </button>
-          <button
-            onClick={() => setActiveTab("updates")}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-              activeTab === "updates" ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm" : "text-zinc-500"
-            }`}
-          >
-            Election Updates
-          </button>
-          <button
-            onClick={() => setActiveTab("profile")}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-              activeTab === "profile" ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm" : "text-zinc-500"
-            }`}
-          >
-            My Profile
-          </button>
         </div>
       </div>
 
@@ -223,7 +205,7 @@ export default function VoterDashboard({
                       <button
                         onClick={() => handleCastVote(election.id)}
                         disabled={!selectedCandidates[election.id]}
-                        className="w-full mt-6 py-2.5 bg-[#1a73e8] hover:bg-blue-700 text-white font-semibold text-sm rounded-full disabled:opacity-50 transition-colors cursor-pointer"
+                        className="w-full mt-6 py-2.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-sm rounded-full disabled:opacity-50 transition-colors cursor-pointer"
                       >
                         Submit Encrypted Ballot Record
                       </button>
@@ -282,7 +264,7 @@ export default function VoterDashboard({
                             </div>
                             <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                               <div 
-                                className="h-full bg-blue-600 rounded-full" 
+                                className="h-full bg-[#0B1E40] rounded-full" 
                                 style={{ width: `${pct}%` }} 
                               />
                             </div>
@@ -437,10 +419,31 @@ export default function VoterDashboard({
                   />
                 </div>
 
+                <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/40 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                      <span className="text-xs font-semibold text-zinc-950 dark:text-zinc-50">🔒 Activate Credential Guard Lock</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={profileGuardLocked}
+                        onChange={(e) => setProfileGuardLocked(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-200 dark:bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-zinc-400">
+                    When active, signing in with your Google email will require validating this local password as a mandatory secondary authentication lock.
+                  </p>
+                </div>
+
                 <div className="pt-2">
                   <button 
                     type="submit"
-                    className="w-full py-2.5 bg-[#1a73e8] hover:bg-blue-700 text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
+                    className="w-full py-2.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
                   >
                     Save Credentials
                   </button>

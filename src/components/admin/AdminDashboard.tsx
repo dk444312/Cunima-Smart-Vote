@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { 
-  Plus, Vote, Sparkles, Trash2, Key, Users, Eye, EyeOff, FileText, Database, Users2, Briefcase, Check, Square, CheckSquare, X, AlertCircle 
+  Plus, Vote, Sparkles, Trash2, Key, Users, Eye, EyeOff, FileText, Database, Users2, Briefcase, Check, Square, CheckSquare, X, AlertCircle, ShieldCheck
 } from "lucide-react";
 import { LoggedInUser, ElectionRow, VoteRow, VoterRow, ClubRow, ClubMemberRow, UpdateRow, UpdateLikeRow, UpdateCommentRow, StudentRow } from "../../types.ts";
 import { dbService } from "../../lib/supabase.ts";
@@ -9,8 +9,8 @@ import StudentsManager from "./StudentsManager.tsx";
 
 interface AdminDashboardProps {
   currentUser: LoggedInUser;
-  activeMenu: "election" | "voters" | "clubs" | "results" | "profile" | "sql_db" | "updates" | "students";
-  setActiveMenu: (menu: "election" | "voters" | "clubs" | "results" | "profile" | "sql_db" | "updates" | "students") => void;
+  activeMenu: "election" | "voters" | "clubs" | "results" | "profile" | "sql_db" | "updates" | "students" | "verified";
+  setActiveMenu: (menu: "election" | "voters" | "clubs" | "results" | "profile" | "sql_db" | "updates" | "students" | "verified") => void;
   elections: ElectionRow[];
   votes: VoteRow[];
   voters: VoterRow[];
@@ -262,7 +262,7 @@ export default function AdminDashboard({
 
               <button
                 type="submit"
-                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer"
+                className="w-full py-2 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer"
               >
                 Insert Election Row
               </button>
@@ -686,7 +686,7 @@ export default function AdminDashboard({
 
               <button 
                 type="submit"
-                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer"
+                className="w-full py-2 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer"
               >
                 Create Club Page
               </button>
@@ -749,7 +749,7 @@ export default function AdminDashboard({
                             onClick={() => setSelectedClubIdForManage(isManaging ? null : club.id)}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
                               isManaging 
-                                ? "bg-blue-600 text-white" 
+                                ? "bg-[#0B1E40] text-white" 
                                 : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200"
                             }`}
                           >
@@ -769,20 +769,29 @@ export default function AdminDashboard({
                       {/* Ticking Members Panel */}
                       {isManaging && (
                         <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
-                          <div className="flex justify-between items-center">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                             <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider font-mono">
                               Tick Club Members for "{club.name}"
                             </span>
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono">
+                              ⚠️ Verified Students Only
+                            </span>
                           </div>
 
-                          {voters.length === 0 ? (
-                            <p className="text-xs text-zinc-400">No voters registered in voter directory.</p>
+                          <p className="text-[10px] text-zinc-400">
+                            Only official, Google-verified student accounts in the directory can be ticked for membership eligibility.
+                          </p>
+
+                          {voters.filter(v => students.some(s => s.email && s.email.toLowerCase() === v.username.toLowerCase())).length === 0 ? (
+                            <p className="text-xs text-zinc-400 italic">No verified, connected student users are currently in the directory to select.</p>
                           ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
-                              {voters.map((voter) => {
+                              {voters.filter(v => students.some(s => s.email && s.email.toLowerCase() === v.username.toLowerCase())).map((voter) => {
                                 const isMember = clubMembers.some(
                                   m => m.club_id === club.id && m.voter_id === voter.id
                                 );
+
+                                const linkedStudent = students.find(s => s.email && s.email.toLowerCase() === voter.username.toLowerCase());
 
                                 return (
                                   <button
@@ -796,8 +805,10 @@ export default function AdminDashboard({
                                     }`}
                                   >
                                     <div className="flex flex-col">
-                                      <span className="font-semibold">{voter.username}</span>
-                                      <span className="text-[10px] text-zinc-400 font-mono">Role: {voter.role || 'voter'}</span>
+                                      <span className="font-semibold">
+                                        {linkedStudent ? `${linkedStudent.first_name} ${linkedStudent.surname}` : voter.username}
+                                      </span>
+                                      <span className="text-[10px] text-zinc-400 font-mono truncate max-w-[180px]">{voter.username}</span>
                                     </div>
                                     <div>
                                       {isMember ? (
@@ -874,7 +885,7 @@ export default function AdminDashboard({
                           </div>
                           <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                             <div 
-                              className="h-full bg-blue-600 rounded-full" 
+                              className="h-full bg-[#0B1E40] rounded-full" 
                               style={{ width: `${pct}%` }} 
                             />
                           </div>
@@ -889,7 +900,7 @@ export default function AdminDashboard({
                       className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                         election.published 
                           ? "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200" 
-                          : "bg-blue-600 hover:bg-blue-700 text-white border-blue-500"
+                          : "bg-[#0B1E40] hover:bg-blue-900 text-white border-blue-500"
                       }`}
                     >
                       {election.published ? "Withdraw Publication" : "Publish to Feed"}
@@ -980,7 +991,7 @@ export default function AdminDashboard({
             <div className="pt-2">
               <button 
                 type="submit"
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
+                className="w-full py-2.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
               >
                 Update Credentials
               </button>
@@ -997,6 +1008,129 @@ export default function AdminDashboard({
           showToast={showToast}
           setIsLoading={setIsLoading}
         />
+      )}
+
+      {/* ================== VERIFIED USERS VIEW ================== */}
+      {activeMenu === "verified" && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-normal text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+                <span className="p-1.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl text-emerald-600 dark:text-emerald-400">
+                  <ShieldCheck className="w-5 h-5" />
+                </span>
+                <span>Verified Campus Directory</span>
+              </h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                List of official students who have successfully linked and verified their identity using university Google credentials.
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
+              <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider font-mono">Total Verified Accounts</span>
+              <div className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mt-1">
+                {voters.filter(v => students.some(s => s.email && s.email.toLowerCase() === v.username.toLowerCase())).length}
+              </div>
+            </div>
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
+              <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider font-mono font-sans">Registry Records</span>
+              <div className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mt-1">
+                {students.length}
+              </div>
+            </div>
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
+              <span className="text-[10px] uppercase font-bold tracking-wider font-sans text-emerald-600 dark:text-emerald-400">Club Eligibility Rate</span>
+              <div className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
+                {students.length > 0 
+                  ? `${Math.round((voters.filter(v => students.some(s => s.email && s.email.toLowerCase() === v.username.toLowerCase())).length / students.length) * 100)}%`
+                  : "0%"
+                }
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
+            <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Verified Student Directories</span>
+              <span className="text-[10px] font-bold text-zinc-400 font-mono">CLUB MEMBERSHIP GATEWAY</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-zinc-50 dark:bg-zinc-800/40 text-[10px] font-bold text-zinc-400 uppercase font-mono tracking-wider border-b border-zinc-100 dark:border-zinc-800">
+                    <th className="p-4">Student Profile</th>
+                    <th className="p-4">Reg Number</th>
+                    <th className="p-4">Program Course</th>
+                    <th className="p-4">CUM</th>
+                    <th className="p-4">Clubs Engaged</th>
+                    <th className="p-4 text-right">Verification Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                  {voters.filter(v => students.some(s => s.email && s.email.toLowerCase() === v.username.toLowerCase())).map((voter) => {
+                    const student = students.find(s => s.email && s.email.toLowerCase() === voter.username.toLowerCase())!;
+                    const userClubs = clubMembers
+                      .filter(m => m.voter_id === voter.id)
+                      .map(m => clubs.find(c => c.id === m.club_id)?.name || "")
+                      .filter(Boolean);
+
+                    return (
+                      <tr key={voter.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10">
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs uppercase">
+                              {student.first_name[0]}{student.surname[0]}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-zinc-900 dark:text-zinc-50">
+                                {student.first_name} {student.surname}
+                              </div>
+                              <div className="text-[10px] text-zinc-400 font-mono">{voter.username}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4 font-mono text-zinc-600 dark:text-zinc-400">{student.registration_number}</td>
+                        <td className="p-4 text-zinc-600 dark:text-zinc-400">{student.program_name}</td>
+                        <td className="p-4 font-mono text-zinc-600 dark:text-zinc-400 font-bold">{student.cum_number}</td>
+                        <td className="p-4">
+                          {userClubs.length === 0 ? (
+                            <span className="text-zinc-400 italic">None active</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {userClubs.map((club, i) => (
+                                <span key={i} className="text-[9px] bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-900/30">
+                                  {club}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-4 text-right">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/30">
+                            <Check className="w-3 h-3" />
+                            <span>Linked Google Session</span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {voters.filter(v => students.some(s => s.email && s.email.toLowerCase() === v.username.toLowerCase())).length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-zinc-500 italic">
+                        No verified student accounts have initialized their Google OAuth sessions yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ================== SQL DB INSPECTOR VIEW ================== */}

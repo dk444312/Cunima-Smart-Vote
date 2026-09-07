@@ -22,6 +22,7 @@ export interface VoterRow {
   created_at: string;
   is_blocked?: boolean;
   role?: 'voter' | 'club_manager' | 'admin'; // can be regular voter, club_manager, or admin
+  guard_locked?: boolean;
 }
 
 export interface VoteRow {
@@ -51,6 +52,7 @@ export interface LoggedInUser {
   username: string;
   role: 'admin' | 'voter' | 'club_manager';
   is_blocked?: boolean;
+  guard_locked?: boolean;
 }
 
 export interface UpdateRow {

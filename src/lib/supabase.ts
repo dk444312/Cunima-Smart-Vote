@@ -26,6 +26,32 @@ const CLUBS_KEY = "g_election_clubs_table";
 const CLUB_MEMBERS_KEY = "g_election_club_members_table";
 const STUDENTS_KEY = "g_election_students_table";
 
+// Live concurrent read caching to handle peak loads (prevents hammering Supabase when multiple active voters query the system)
+const CACHE_TTL_MS = 2500; // 2.5 seconds cache time is perfect: provides extreme UI responsiveness and saves server limits
+const dbCache: Record<string, { data: any; expiry: number }> = {};
+
+function getCachedData<T>(key: string): T | null {
+  const cacheObj = dbCache[key];
+  if (cacheObj && Date.now() < cacheObj.expiry) {
+    return cacheObj.data as T;
+  }
+  return null;
+}
+
+function setCachedData<T>(key: string, data: T): void {
+  dbCache[key] = {
+    data,
+    expiry: Date.now() + CACHE_TTL_MS
+  };
+}
+
+export function invalidateDBCache(): void {
+  // Clear all cached responses on write actions to force fresh fetches instantly
+  for (const k in dbCache) {
+    delete dbCache[k];
+  }
+}
+
 // Helper to get local storage tables
 function getLocalTable<T>(key: string): T[] {
   const data = localStorage.getItem(key);
@@ -160,18 +186,25 @@ export async function initializeDatabase() {
 export const dbService = {
   // ELECTIONS
   async getElections(): Promise<ElectionRow[]> {
+    const cached = getCachedData<ElectionRow[]>("elections");
+    if (cached) return cached;
+
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
         .from("elections")
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
+      setCachedData("elections", data || []);
       return data || [];
     }
-    return getLocalTable<ElectionRow>(ELECTIONS_KEY);
+    const local = getLocalTable<ElectionRow>(ELECTIONS_KEY);
+    setCachedData("elections", local);
+    return local;
   },
 
   async insertElection(title: string, description: string, candidates: string[], clubId?: string | null, status: "draft" | "active" | "completed" = "draft"): Promise<ElectionRow> {
+    invalidateDBCache();
     const id = "elec_" + Math.floor(Math.random() * 1000000).toString();
     const newElection: ElectionRow = {
       id,
@@ -201,6 +234,7 @@ export const dbService = {
   },
 
   async updateElection(id: string, updates: Partial<ElectionRow>): Promise<void> {
+    invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("elections")
@@ -216,6 +250,7 @@ export const dbService = {
   },
 
   async deleteElection(id: string): Promise<void> {
+    invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("elections")
@@ -237,18 +272,25 @@ export const dbService = {
 
   // VOTERS
   async getVoters(): Promise<VoterRow[]> {
+    const cached = getCachedData<VoterRow[]>("voters");
+    if (cached) return cached;
+
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
         .from("voters")
         .select("*")
         .order("username");
       if (error) throw error;
+      setCachedData("voters", data || []);
       return data || [];
     }
-    return getLocalTable<VoterRow>(VOTERS_KEY);
+    const local = getLocalTable<VoterRow>(VOTERS_KEY);
+    setCachedData("voters", local);
+    return local;
   },
 
   async insertVoter(username: string, password?: string, role: 'voter' | 'club_manager' | 'admin' = 'voter'): Promise<VoterRow> {
+    invalidateDBCache();
     const id = "voter_" + Math.floor(Math.random() * 1000000).toString();
     const newVoter: VoterRow = {
       id,
@@ -284,6 +326,7 @@ export const dbService = {
   },
 
   async updateVoter(id: string, updates: Partial<VoterRow>): Promise<void> {
+    invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("voters")
@@ -310,6 +353,7 @@ export const dbService = {
   },
 
   async deleteVoter(id: string): Promise<void> {
+    invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("voters")
@@ -331,17 +375,24 @@ export const dbService = {
 
   // VOTES (Relational Junction)
   async getVotes(): Promise<VoteRow[]> {
+    const cached = getCachedData<VoteRow[]>("votes");
+    if (cached) return cached;
+
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
         .from("votes")
         .select("*");
       if (error) throw error;
+      setCachedData("votes", data || []);
       return data || [];
     }
-    return getLocalTable<VoteRow>(VOTES_KEY);
+    const local = getLocalTable<VoteRow>(VOTES_KEY);
+    setCachedData("votes", local);
+    return local;
   },
 
   async insertVote(voterId: string, electionId: string, candidate: string): Promise<VoteRow> {
+    invalidateDBCache();
     const id = "vote_" + Math.floor(Math.random() * 1000000).toString();
     const newVote: VoteRow = {
       id,
@@ -377,18 +428,25 @@ export const dbService = {
 
   // ELECTION UPDATES FEED
   async getUpdates(): Promise<UpdateRow[]> {
+    const cached = getCachedData<UpdateRow[]>("updates");
+    if (cached) return cached;
+
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
         .from("updates")
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
+      setCachedData("updates", data || []);
       return data || [];
     }
-    return getLocalTable<UpdateRow>(UPDATES_KEY).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const local = getLocalTable<UpdateRow>(UPDATES_KEY).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    setCachedData("updates", local);
+    return local;
   },
 
   async insertUpdate(content: string, author: string): Promise<UpdateRow> {
+    invalidateDBCache();
     const id = "upd_" + Math.floor(Math.random() * 1000000).toString();
     const newUpdate: UpdateRow = {
       id,
@@ -414,6 +472,7 @@ export const dbService = {
   },
 
   async deleteUpdate(id: string): Promise<void> {
+    invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("updates")
@@ -534,18 +593,25 @@ export const dbService = {
 
   // CLUBS
   async getClubs(): Promise<ClubRow[]> {
+    const cached = getCachedData<ClubRow[]>("clubs");
+    if (cached) return cached;
+
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
         .from("clubs")
         .select("*")
         .order("name");
       if (error) throw error;
+      setCachedData("clubs", data || []);
       return data || [];
     }
-    return getLocalTable<ClubRow>(CLUBS_KEY);
+    const local = getLocalTable<ClubRow>(CLUBS_KEY);
+    setCachedData("clubs", local);
+    return local;
   },
 
   async insertClub(name: string, description: string, managerId: string | null): Promise<ClubRow> {
+    invalidateDBCache();
     const id = "club_" + Math.floor(Math.random() * 1000000).toString();
     const newClub: ClubRow = {
       id,
@@ -587,6 +653,7 @@ export const dbService = {
   },
 
   async deleteClub(id: string): Promise<void> {
+    invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("clubs")
@@ -607,6 +674,14 @@ export const dbService = {
 
   // CLUB MEMBERS
   async getClubMembers(clubId?: string): Promise<ClubMemberRow[]> {
+    const cached = getCachedData<ClubMemberRow[]>("club_members");
+    if (cached) {
+      if (clubId) {
+        return cached.filter(m => m.club_id === clubId);
+      }
+      return cached;
+    }
+
     if (isSupabaseConfigured && supabase) {
       let query = supabase.from("club_members").select("*");
       if (clubId) {
@@ -614,10 +689,16 @@ export const dbService = {
       }
       const { data, error } = await query;
       if (error) throw error;
+      if (!clubId) {
+        setCachedData("club_members", data || []);
+      }
       return data || [];
     }
 
     const all = getLocalTable<ClubMemberRow>(CLUB_MEMBERS_KEY);
+    if (!clubId) {
+      setCachedData("club_members", all);
+    }
     if (clubId) {
       return all.filter(m => m.club_id === clubId);
     }
@@ -625,6 +706,7 @@ export const dbService = {
   },
 
   async setClubMembers(clubId: string, voterIds: string[]): Promise<void> {
+    invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
       const { error: delError } = await supabase
         .from("club_members")
@@ -660,18 +742,25 @@ export const dbService = {
 
   // STUDENTS
   async getStudents(): Promise<StudentRow[]> {
+    const cached = getCachedData<StudentRow[]>("students");
+    if (cached) return cached;
+
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
         .from("students")
         .select("*")
         .order("surname", { ascending: true });
       if (error) throw error;
+      setCachedData("students", data || []);
       return data || [];
     }
-    return getLocalTable<StudentRow>(STUDENTS_KEY);
+    const local = getLocalTable<StudentRow>(STUDENTS_KEY);
+    setCachedData("students", local);
+    return local;
   },
 
   async insertStudent(student: Omit<StudentRow, 'id' | 'uploaded_at'>): Promise<StudentRow> {
+    invalidateDBCache();
     const id = "stud_" + Math.floor(Math.random() * 1000000).toString();
     const newStudent: StudentRow = {
       ...student,
@@ -710,6 +799,7 @@ export const dbService = {
   },
 
   async deleteStudent(id: string): Promise<void> {
+    invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("students")
@@ -723,6 +813,7 @@ export const dbService = {
   },
 
   async approveStudent(id: string): Promise<void> {
+    invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("students")
@@ -740,6 +831,7 @@ export const dbService = {
   },
 
   async linkStudentEmail(id: string, email: string): Promise<void> {
+    invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("students")

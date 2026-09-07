@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { 
-  Menu, Info, Moon, Sun, LogOut, RefreshCw, Copy, TrendingUp, Award, ShieldCheck, Database, Users2, ShieldAlert, Vote, Check, UserCheck
+  Menu, Info, Moon, Sun, LogOut, RefreshCw, Copy, TrendingUp, Award, ShieldCheck, Database, Users2, ShieldAlert, Vote, Check, UserCheck, Lock
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { dbService, isSupabaseConfigured, initializeDatabase, PREMADE_ADMIN, PREMADE_VOTER, PREMADE_MANAGER } from "./lib/supabase.ts";
@@ -59,6 +59,8 @@ export default function App() {
     student: StudentRow;
     activeUser: LoggedInUser;
   } | null>(null);
+  const [activeGuardLockUser, setActiveGuardLockUser] = useState<LoggedInUser | null>(null);
+  const [guardLockPasswordInput, setGuardLockPasswordInput] = useState("");
 
   // Form states for Admin (passed down or handled centrally)
   const [newElectionTitle, setNewElectionTitle] = useState("");
@@ -79,7 +81,7 @@ export default function App() {
 
   // Navigation state
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeMenu, setActiveMenu] = useState<"election" | "voters" | "clubs" | "results" | "profile" | "sql_db" | "updates" | "students">("election");
+  const [activeMenu, setActiveMenu] = useState<string>("election");
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const [selectedClubIdForManage, setSelectedClubIdForManage] = useState<string | null>(null);
 
@@ -152,6 +154,18 @@ export default function App() {
       setCurrentUser(JSON.parse(saved));
     }
   }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      if (currentUser.role === "admin") {
+        setActiveMenu("election");
+      } else if (currentUser.role === "club_manager") {
+        setActiveMenu("club_elections");
+      } else {
+        setActiveMenu("ballot");
+      }
+    }
+  }, [currentUser]);
 
   // Sync Dark Mode Class on Document Body
   useEffect(() => {
@@ -746,17 +760,17 @@ export default function App() {
       {/* GLOBAL BANNER */}
       <header className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 py-3.5 px-6 sticky top-0 z-40 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <div className="w-8 h-8 rounded-full bg-[#0B1E40] flex items-center justify-center text-white shadow-md shadow-blue-500/20">
             <Vote className="w-4.5 h-4.5" />
           </div>
           <div>
             <h1 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-white">
-              Socrates Poll Desk
+              CampusVote
             </h1>
             <p className="text-[10px] text-zinc-400 font-mono flex items-center gap-1">
-              <span>Relational Postgres State</span>
+              <span>CampusVote</span>
               <span className={`inline-block w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`} />
-              <span>{isSupabaseConfigured ? "Supabase Live" : "Local Mock Storage"}</span>
+              <span>{isSupabaseConfigured ? "CampusVote" : "Local Mock Storage"}</span>
             </p>
           </div>
         </div>
@@ -809,7 +823,7 @@ export default function App() {
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed font-semibold">
                     Email address: <span className="font-mono text-blue-600 dark:text-blue-400">{pendingGoogleUser?.email}</span>
                   </p>
-                  <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 py-2 px-3 rounded-xl border border-amber-100 dark:border-amber-900/30 mt-4 text-[11px] font-medium leading-relaxed">
+                  <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 py-2 px-3 rounded-full border border-amber-100 dark:border-amber-900/30 mt-4 text-[11px] font-medium leading-relaxed">
                     Status: Pending Verification. You will be connected automatically once approved by the administrator.
                   </p>
                 </div>
@@ -833,7 +847,7 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-xl border border-blue-100 dark:border-blue-900/30 text-[11px] text-blue-800 dark:text-blue-300 font-mono break-all">
+                <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-full border border-blue-100 dark:border-blue-900/30 text-[11px] text-blue-800 dark:text-blue-300 font-mono break-all">
                   Connected: {pendingGoogleUser.email}
                 </div>
 
@@ -846,7 +860,7 @@ export default function App() {
                         value={regFirstName}
                         onChange={(e) => setRegFirstName(e.target.value)}
                         placeholder="e.g. Desire"
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
                         required
                       />
                     </div>
@@ -857,7 +871,7 @@ export default function App() {
                         value={regSurname}
                         onChange={(e) => setRegSurname(e.target.value)}
                         placeholder="e.g. Kandodo"
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
                         required
                       />
                     </div>
@@ -871,7 +885,7 @@ export default function App() {
                         value={regNumber}
                         onChange={(e) => setRegNumber(e.target.value)}
                         placeholder="e.g. REG/CS/2026/011"
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
                         required
                       />
                     </div>
@@ -882,7 +896,7 @@ export default function App() {
                         value={regCum}
                         onChange={(e) => setRegCum(e.target.value)}
                         placeholder="e.g. 3.75 or 76.5"
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
                         required
                       />
                     </div>
@@ -895,7 +909,7 @@ export default function App() {
                       value={regProgram}
                       onChange={(e) => setRegProgram(e.target.value)}
                       placeholder="e.g. BSc Computer Science"
-                      className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                      className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
                       required
                     />
                   </div>
@@ -908,7 +922,7 @@ export default function App() {
                         value={regYear}
                         onChange={(e) => setRegYear(e.target.value)}
                         placeholder="e.g. 2026/2027"
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
                         required
                       />
                     </div>
@@ -917,7 +931,7 @@ export default function App() {
                       <select
                         value={regGender}
                         onChange={(e) => setRegGender(e.target.value)}
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
                       >
                         <option value="M">Male (M)</option>
                         <option value="F">Female (F)</option>
@@ -940,7 +954,7 @@ export default function App() {
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs rounded-full shadow-md shadow-blue-500/15 transition-colors cursor-pointer text-center"
+                      className="flex-1 py-2.5 bg-[#0B1E40] hover:bg-blue-900 disabled:opacity-50 text-white font-semibold text-xs rounded-full shadow-md shadow-blue-500/15 transition-colors cursor-pointer text-center"
                     >
                       {isLoading ? "Submitting..." : "Submit Registration"}
                     </button>
@@ -961,14 +975,14 @@ export default function App() {
 
                 <div className="space-y-4 font-sans text-xs">
                   <div className="grid grid-cols-2 gap-3.5">
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">First Name</span>
                       <p className="font-semibold text-zinc-900 dark:text-zinc-50 text-sm">
                         {pendingIdentityConfirm.student.first_name}
                       </p>
                     </div>
 
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Surname</span>
                       <p className="font-semibold text-zinc-900 dark:text-zinc-50 text-sm">
                         {pendingIdentityConfirm.student.surname}
@@ -977,14 +991,14 @@ export default function App() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3.5">
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Registration Number</span>
                       <p className="font-semibold text-zinc-900 dark:text-zinc-50 font-mono text-[13px]">
                         {pendingIdentityConfirm.student.registration_number}
                       </p>
                     </div>
 
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Academic Year</span>
                       <p className="font-semibold text-zinc-900 dark:text-zinc-50 font-mono">
                         {pendingIdentityConfirm.student.academic_year}
@@ -992,7 +1006,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                  <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
                     <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Registered Program Course</span>
                     <p className="font-semibold text-zinc-900 dark:text-zinc-50">
                       {pendingIdentityConfirm.student.program_name}
@@ -1000,14 +1014,14 @@ export default function App() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3.5">
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">CUM Number</span>
                       <p className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-sm">
                         {pendingIdentityConfirm.student.cum_number}
                       </p>
                     </div>
 
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-900/50">
+                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Connected Google Account</span>
                       <p className="font-semibold text-blue-600 dark:text-blue-400 font-mono truncate">
                         {pendingIdentityConfirm.activeUser.username}
@@ -1031,16 +1045,101 @@ export default function App() {
                     type="button"
                     onClick={() => {
                       const userObj = pendingIdentityConfirm.activeUser;
-                      setCurrentUser(userObj);
-                      localStorage.setItem("g_election_active_user", JSON.stringify(userObj));
-                      setPendingIdentityConfirm(null);
-                      showToast("Identity Confirmed: Welcome to Socrates Campus Portal.");
+                      if (userObj.guard_locked) {
+                        setActiveGuardLockUser(userObj);
+                        setPendingIdentityConfirm(null);
+                        setGuardLockPasswordInput("");
+                        showToast("Guard Lock Active: Please enter your credential password.");
+                      } else {
+                        setCurrentUser(userObj);
+                        localStorage.setItem("g_election_active_user", JSON.stringify(userObj));
+                        setPendingIdentityConfirm(null);
+                        showToast("Identity Confirmed: Welcome to Socrates Campus Portal.");
+                      }
                     }}
-                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-500/10 transition-all active:scale-95 cursor-pointer text-center"
+                    className="flex-1 py-3 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-500/10 transition-all active:scale-95 cursor-pointer text-center"
                   >
                     Yes, Confirm & Explore
                   </button>
                 </div>
+              </div>
+            ) : activeGuardLockUser ? (
+              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+                <div className="text-center space-y-2 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-950/40 rounded-2xl flex items-center justify-center text-amber-600 mx-auto">
+                    <Lock className="w-6 h-6 animate-bounce" />
+                  </div>
+                  <h2 className="text-lg font-bold text-zinc-950 dark:text-zinc-50">🔒 Credential Guard Lock</h2>
+                  <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                    Your account has active Guard Lock protection. Please enter your secondary voter credential password to access the voting ballots.
+                  </p>
+                </div>
+
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    setIsLoading(true);
+                    // Match password in database/localStorage
+                    const votersList = await dbService.getVoters();
+                    const liveV = votersList.find(v => v.id === activeGuardLockUser.id);
+                    if (liveV && liveV.password === guardLockPasswordInput) {
+                      setCurrentUser(activeGuardLockUser);
+                      localStorage.setItem("g_election_active_user", JSON.stringify(activeGuardLockUser));
+                      setActiveGuardLockUser(null);
+                      setGuardLockPasswordInput("");
+                      showToast("Guard Lock Passed: Welcome to Socrates Campus Portal.");
+                    } else {
+                      showToast("Authentication Error: Invalid credential password.");
+                    }
+                  } catch (err: any) {
+                    showToast(`Error: ${err.message}`);
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Username / ID</label>
+                    <input 
+                      type="text"
+                      value={activeGuardLockUser.username}
+                      disabled
+                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-full text-zinc-400 font-semibold text-xs font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Guard Passcode / Password</label>
+                    <input 
+                      type="password"
+                      value={guardLockPasswordInput}
+                      onChange={(e) => setGuardLockPasswordInput(e.target.value)}
+                      placeholder="Enter guard password"
+                      className="w-full px-4 py-3 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-amber-500 focus:outline-none text-xs font-semibold text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 font-mono"
+                      required
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveGuardLockUser(null);
+                        setGuardLockPasswordInput("");
+                        showToast("Guard Lock verification cancelled.");
+                      }}
+                      className="flex-1 py-3 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold rounded-full transition-all cursor-pointer text-center"
+                    >
+                      Cancel Login
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-3 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-xs rounded-full shadow-lg shadow-amber-500/10 transition-all cursor-pointer text-center"
+                    >
+                      Unlock Session
+                    </button>
+                  </div>
+                </form>
               </div>
             ) : isSearchingProfile ? (
               <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm space-y-6 text-center">
@@ -1086,7 +1185,7 @@ export default function App() {
                 {/* GOOGLE SIGN IN - PRIMARY ENTRANCE */}
                 <div className="space-y-4">
                   {loginError && (
-                    <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-xs font-medium flex items-center gap-2 border border-red-200 dark:border-red-900/50">
+                    <div className="p-3.5 rounded-full bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-xs font-medium flex items-center gap-2 border border-red-200 dark:border-red-900/50">
                       <ShieldAlert className="w-4 h-4 flex-shrink-0" />
                       <span>{loginError}</span>
                     </div>
@@ -1096,7 +1195,7 @@ export default function App() {
                     type="button"
                     onClick={handleGoogleSignIn}
                     disabled={isLoading}
-                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-full flex items-center justify-center gap-2.5 shadow-lg shadow-blue-500/15 border-none transition-all active:scale-95 cursor-pointer"
+                    className="w-full py-3.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-sm rounded-full flex items-center justify-center gap-2.5 shadow-lg shadow-blue-500/15 border-none transition-all active:scale-95 cursor-pointer"
                     id="btn_google_signin"
                   >
                     <svg className="w-4 h-4 filter brightness-0 invert" viewBox="0 0 24 24" fill="currentColor">
@@ -1124,7 +1223,7 @@ export default function App() {
                       value={usernameInput}
                       onChange={(e) => setUsernameInput(e.target.value)}
                       placeholder="Enter your credential username"
-                      className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
+                      className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
                       required
                     />
                   </div>
@@ -1145,7 +1244,7 @@ export default function App() {
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
+                      className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
                       required
                     />
                   </div>
@@ -1168,7 +1267,7 @@ export default function App() {
                   <div className="grid grid-cols-3 gap-2 text-[11px] font-semibold text-zinc-500">
                     <button 
                       onClick={() => { setUsernameInput("admin"); setPasswordInput("admin"); }}
-                      className="p-2 bg-zinc-50 dark:bg-zinc-800/40 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl text-center border border-zinc-200/60 dark:border-zinc-800/60 transition-all cursor-pointer"
+                      className="p-2 bg-zinc-50 dark:bg-zinc-800/40 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-center border border-zinc-200/60 dark:border-zinc-800/60 transition-all cursor-pointer"
                     >
                       <span className="block text-zinc-800 dark:text-zinc-200 font-bold">Admin Panel</span>
                       <span className="text-[10px] text-zinc-400 font-mono">admin / admin</span>
@@ -1176,7 +1275,7 @@ export default function App() {
 
                     <button 
                       onClick={() => { setUsernameInput("manager"); setPasswordInput("manager"); }}
-                      className="p-2 bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/50 dark:hover:bg-purple-900/20 rounded-xl text-center border border-purple-200/60 dark:border-purple-900/60 transition-all cursor-pointer text-purple-700 dark:text-purple-300"
+                      className="p-2 bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/50 dark:hover:bg-purple-900/20 rounded-full text-center border border-purple-200/60 dark:border-purple-900/60 transition-all cursor-pointer text-purple-700 dark:text-purple-300"
                     >
                       <span className="block font-bold">Club Manager</span>
                       <span className="text-[10px] text-purple-400 font-mono">manager / manager</span>
@@ -1184,7 +1283,7 @@ export default function App() {
 
                     <button 
                       onClick={() => { setUsernameInput("voter"); setPasswordInput("voter"); }}
-                      className="p-2 bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-100/50 dark:hover:bg-blue-900/20 rounded-xl text-center border border-blue-200/60 dark:border-blue-900/60 transition-all cursor-pointer text-blue-700 dark:text-blue-300"
+                      className="p-2 bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-100/50 dark:hover:bg-blue-900/20 rounded-full text-center border border-blue-200/60 dark:border-blue-900/60 transition-all cursor-pointer text-blue-700 dark:text-blue-300"
                     >
                       <span className="block font-bold">Voter Card</span>
                       <span className="text-[10px] text-blue-400 font-mono">voter / voter</span>
@@ -1198,112 +1297,200 @@ export default function App() {
           /* ================== LOGGED-IN MULTI-DASHBOARD VIEWS ================== */
           <div className="flex-1 flex flex-col md:flex-row">
             
-            {/* SIDEBAR FOR ADMINISTRATIVE ONLY */}
-            {currentUser.role === "admin" && (
-              <aside className={`w-full md:w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col justify-between ${isSidebarOpen ? "block" : "hidden md:flex"}`}>
-                <div className="p-4 space-y-6">
-                  <span className="text-xs font-bold tracking-wider text-zinc-400 uppercase font-mono block px-3">
-                    Admin workspace
-                  </span>
+            {/* SIDEBAR FOR ALL ROLES */}
+            <aside className={`w-full md:w-64 bg-[#0B1E40] text-white flex flex-col justify-between ${isSidebarOpen ? "block" : "hidden md:flex"}`}>
+              <div className="p-4 space-y-6">
+                <span className="text-xs font-bold tracking-wider text-blue-300 uppercase font-mono block px-3">
+                  {currentUser.role === "admin" ? "Admin Workspace" : currentUser.role === "club_manager" ? "Club Management" : "Voter Portal"}
+                </span>
 
-                  <nav className="space-y-1">
-                    <button 
-                      onClick={() => setActiveMenu("election")}
-                      className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                        activeMenu === "election" ? "bg-blue-50 dark:bg-blue-950/40 text-[#1a73e8] dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                      }`}
-                    >
-                      <span>Public Elections</span>
-                      <span className="bg-zinc-100 dark:bg-zinc-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                        {elections.filter(e => !e.club_id).length}
-                      </span>
-                    </button>
+                <nav className="space-y-1">
+                  {currentUser.role === "admin" && (
+                    <>
+                      <button 
+                        onClick={() => setActiveMenu("election")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "election" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>Public Elections</span>
+                        <span className="bg-blue-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                          {elections.filter(e => !e.club_id).length}
+                        </span>
+                      </button>
 
-                    <button 
-                      onClick={() => setActiveMenu("voters")}
-                      className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                        activeMenu === "voters" ? "bg-blue-50 dark:bg-blue-950/40 text-[#1a73e8] dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                      }`}
-                    >
-                      <span>Manage Users</span>
-                      <span className="bg-zinc-100 dark:bg-zinc-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                        {voters.length}
-                      </span>
-                    </button>
+                      <button 
+                        onClick={() => setActiveMenu("voters")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "voters" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>Manage Users</span>
+                        <span className="bg-blue-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                          {voters.length}
+                        </span>
+                      </button>
 
-                    <button 
-                      onClick={() => setActiveMenu("clubs")}
-                      className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                        activeMenu === "clubs" ? "bg-blue-50 dark:bg-blue-950/40 text-[#1a73e8] dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                      }`}
-                    >
-                      <span>Student Clubs</span>
-                      <span className="bg-zinc-100 dark:bg-zinc-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                        {clubs.length}
-                      </span>
-                    </button>
+                      <button 
+                        onClick={() => setActiveMenu("clubs")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "clubs" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>Student Clubs</span>
+                        <span className="bg-blue-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                          {clubs.length}
+                        </span>
+                      </button>
 
-                    <button 
-                      onClick={() => setActiveMenu("results")}
-                      className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                        activeMenu === "results" ? "bg-blue-50 dark:bg-blue-950/40 text-[#1a73e8] dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                      }`}
-                    >
-                      <span>Publish Feed</span>
-                    </button>
+                      <button 
+                        onClick={() => setActiveMenu("results")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "results" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>Publish Feed</span>
+                      </button>
 
-                    <button 
-                      onClick={() => setActiveMenu("updates")}
-                      className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                        activeMenu === "updates" ? "bg-blue-50 dark:bg-blue-950/40 text-[#1a73e8] dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                      }`}
-                    >
-                      <span>Broadcast Socials</span>
-                    </button>
+                      <button 
+                        onClick={() => setActiveMenu("updates")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "updates" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>Broadcast Socials</span>
+                      </button>
 
-                    <button 
-                      onClick={() => setActiveMenu("profile")}
-                      className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                        activeMenu === "profile" ? "bg-blue-50 dark:bg-blue-950/40 text-[#1a73e8] dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                      }`}
-                    >
-                      <span>My Profile</span>
-                    </button>
+                      <button 
+                        onClick={() => setActiveMenu("profile")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "profile" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>My Profile</span>
+                      </button>
 
-                    <button 
-                      onClick={() => setActiveMenu("students")}
-                      className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                        activeMenu === "students" ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 font-bold" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                      }`}
-                    >
-                      <span>Students Database</span>
-                      <span className="bg-emerald-100 dark:bg-emerald-900/30 text-[10px] px-2 py-0.5 rounded-full font-bold text-emerald-700 dark:text-emerald-400">
-                        {students.length}
-                      </span>
-                    </button>
+                      <button 
+                        onClick={() => setActiveMenu("students")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "students" ? "bg-emerald-500/20 text-emerald-300 font-bold" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>Students Database</span>
+                        <span className="bg-emerald-900/50 text-[10px] px-2 py-0.5 rounded-full font-bold text-emerald-300">
+                          {students.length}
+                        </span>
+                      </button>
 
-                    <button 
-                      onClick={() => setActiveMenu("sql_db")}
-                      className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                        activeMenu === "sql_db" ? "bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                      }`}
-                    >
-                      <span>SQL DB Inspector</span>
-                    </button>
-                  </nav>
-                </div>
+                      <button 
+                        onClick={() => setActiveMenu("verified")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "verified" ? "bg-emerald-500/20 text-emerald-300 font-bold animate-pulse" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>Verified (Connected)</span>
+                        <span className="bg-emerald-900/50 text-[10px] px-2 py-0.5 rounded-full font-bold text-emerald-300">
+                          {voters.filter(v => students.some(s => s.email && s.email.toLowerCase() === v.username.toLowerCase())).length}
+                        </span>
+                      </button>
 
-                <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 text-[10px] text-zinc-400 font-mono">
-                  <p>Logged as: {currentUser.username}</p>
-                </div>
-              </aside>
-            )}
+                      <button 
+                        onClick={() => setActiveMenu("sql_db")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "sql_db" ? "bg-purple-500/20 text-purple-300" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>SQL DB Inspector</span>
+                      </button>
+                    </>
+                  )}
+
+                  {currentUser.role === "club_manager" && (
+                    <>
+                      <button 
+                        onClick={() => setActiveMenu("club_elections")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "club_elections" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>My Club Elections</span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveMenu("club_members")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "club_members" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>Club Roster</span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveMenu("feed")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "feed" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>Elections Feed</span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveMenu("profile")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "profile" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>My Profile</span>
+                      </button>
+                    </>
+                  )}
+
+                  {currentUser.role === "voter" && (
+                    <>
+                      <button 
+                        onClick={() => setActiveMenu("ballot")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "ballot" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>My Ballots</span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveMenu("results")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "results" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>Election Results</span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveMenu("updates")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "updates" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>Election Updates</span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveMenu("profile")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "profile" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <span>My Profile</span>
+                      </button>
+                    </>
+                  )}
+                </nav>
+              </div>
+
+              <div className="p-4 border-t border-blue-900/50 text-[10px] text-blue-300 font-mono">
+                <p>Logged as: {currentUser.username}</p>
+              </div>
+            </aside>
 
             {/* MAIN PORTLET CONTAINER */}
             <main className="flex-1 p-6 md:p-8 max-w-6xl mx-auto w-full overflow-y-auto">
               
               {isLoading && (
-                <div className="mb-4 p-3 rounded-xl bg-blue-50/50 dark:bg-blue-950/10 text-blue-600 dark:text-blue-400 text-xs font-mono flex items-center gap-2 border border-blue-100 dark:border-blue-900/20">
+                <div className="mb-4 p-3 rounded-full bg-blue-50/50 dark:bg-blue-950/10 text-blue-600 dark:text-blue-400 text-xs font-mono flex items-center gap-2 border border-blue-100 dark:border-blue-900/20">
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                   <span>Syncing state with Supabase servers...</span>
                 </div>
@@ -1394,6 +1581,7 @@ export default function App() {
                   showToast={showToast}
                   isLoading={isLoading}
                   setIsLoading={setIsLoading}
+                  activeTab={activeMenu}
                 />
               ) : (
                 /* ================== ROUTED GENERAL VOTER PORTAL ================== */
@@ -1414,6 +1602,7 @@ export default function App() {
                   refreshDatabaseState={refreshDatabaseState}
                   showToast={showToast}
                   setIsLoading={setIsLoading}
+                  activeTab={activeMenu}
                 />
               )}
 
