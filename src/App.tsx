@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { 
-  Menu, Info, Moon, Sun, LogOut, RefreshCw, Copy, TrendingUp, Award, ShieldCheck, Database, Users2, ShieldAlert, Vote, Check
+  Menu, Info, Moon, Sun, LogOut, RefreshCw, Copy, TrendingUp, Award, ShieldCheck, Database, Users2, ShieldAlert, Vote, Check, UserCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { dbService, isSupabaseConfigured, initializeDatabase, PREMADE_ADMIN, PREMADE_VOTER, PREMADE_MANAGER } from "./lib/supabase.ts";
@@ -50,6 +50,11 @@ export default function App() {
   const [regYear, setRegYear] = useState("");
   const [regCum, setRegCum] = useState("");
   const [regGender, setRegGender] = useState("M");
+
+  // Google Searching Similarity Loader States
+  const [isSearchingProfile, setIsSearchingProfile] = useState(false);
+  const [searchStateMessage, setSearchStateMessage] = useState("");
+  const [currentUserDisplay, setCurrentUserDisplay] = useState("");
 
   // Form states for Admin (passed down or handled centrally)
   const [newElectionTitle, setNewElectionTitle] = useState("");
@@ -254,6 +259,18 @@ export default function App() {
         return;
       }
 
+      // Trigger Searching UI
+      setIsSearchingProfile(true);
+      setCurrentUserDisplay(displayName);
+      setSearchStateMessage("Establishing secure connection to Socrates Database...");
+      await new Promise(resolve => setTimeout(resolve, 700));
+
+      setSearchStateMessage(`Parsing name structures from authenticated email "${email}"...`);
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      setSearchStateMessage("Scanning student registry columns for bi-directional similarities...");
+      await new Promise(resolve => setTimeout(resolve, 900));
+
       // Check Student Register Database: Check full name and the email address name
       const matchedStudent = students.find(s => {
         // 1. Direct Email Match
@@ -292,6 +309,9 @@ export default function App() {
       });
 
       if (matchedStudent) {
+        setSearchStateMessage(`Match Identified! Connecting to student profile of "${matchedStudent.first_name} ${matchedStudent.surname}" [${matchedStudent.registration_number}]...`);
+        await new Promise(resolve => setTimeout(resolve, 900));
+
         // Automatically save their Google email to their student record if it's not set
         if (!matchedStudent.email || matchedStudent.email.toLowerCase() !== email.toLowerCase()) {
           try {
@@ -304,6 +324,7 @@ export default function App() {
 
         if (matchedStudent.status === "pending") {
           setLoginError("Your registration application is currently pending administrator approval. Please wait.");
+          setIsSearchingProfile(false);
           setIsLoading(false);
           return;
         }
@@ -322,6 +343,7 @@ export default function App() {
 
         if (matchedVoter?.is_blocked) {
           setLoginError("This student account has been blocked by administrators.");
+          setIsSearchingProfile(false);
           setIsLoading(false);
           return;
         }
@@ -336,6 +358,8 @@ export default function App() {
         localStorage.setItem("g_election_active_user", JSON.stringify(activeUser));
         showToast(`Google Auth Success: Connected to your student profile.`);
       } else {
+        setSearchStateMessage("No matching student profile found in standard directory database. Redirecting to registration...");
+        await new Promise(resolve => setTimeout(resolve, 1000));
         // NOT in database at all! Trigger Student Profile Registration form!
         setPendingGoogleUser({ email, displayName, uid: user.uid });
         showToast("Student record not found. Please submit your details for verification.");
@@ -344,6 +368,7 @@ export default function App() {
       console.error("Google login failure:", err);
       setLoginError(err.message || "Google Sign-In was cancelled or failed.");
     } finally {
+      setIsSearchingProfile(false);
       setIsLoading(false);
     }
   };
@@ -914,6 +939,35 @@ export default function App() {
                     </button>
                   </div>
                 </form>
+              </div>
+            ) : isSearchingProfile ? (
+              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm space-y-6 text-center">
+                <div className="py-6 flex flex-col items-center justify-center space-y-4">
+                  <div className="relative w-20 h-20">
+                    <div className="absolute inset-0 rounded-full border-4 border-blue-100 dark:border-blue-900/30 animate-pulse" />
+                    <div className="absolute inset-0 rounded-full border-4 border-t-blue-600 dark:border-t-blue-400 animate-spin" />
+                    <div className="absolute inset-4 bg-blue-50 dark:bg-blue-950/40 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400">
+                      <UserCheck className="w-6 h-6 animate-pulse" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold text-[#1a73e8] dark:text-blue-400">Matching Profile...</h3>
+                    <p className="text-xs text-zinc-400">Authenticated as <strong className="text-zinc-700 dark:text-zinc-300">{currentUserDisplay}</strong></p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-zinc-900/50 font-mono text-[11px] text-left space-y-2 text-zinc-600 dark:text-zinc-400">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase">Registry Scanner Active</span>
+                  </div>
+                  <p className="font-semibold text-blue-600 dark:text-blue-400 animate-pulse">{searchStateMessage}</p>
+                </div>
+
+                <div className="text-[10px] text-zinc-400 font-mono">
+                  Socrates Intelligent Verification Engine v1.2
+                </div>
               </div>
             ) : (
               <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { 
-  Upload, Plus, Search, Trash2, FileSpreadsheet, AlertCircle, CheckCircle2, X, Filter, Sparkles, ChevronLeft, ChevronRight, Users2
+  Upload, Plus, Search, Trash2, FileSpreadsheet, AlertCircle, CheckCircle2, X, Filter, Sparkles, ChevronLeft, ChevronRight, Users2, Link, Mail
 } from "lucide-react";
 import { StudentRow } from "../../types.ts";
 import { dbService } from "../../lib/supabase.ts";
@@ -21,6 +21,10 @@ export default function StudentsManager({
   // Modal / Form trigger states
   const [isAddingSingle, setIsAddingSingle] = useState(false);
   const [isUploadingCSV, setIsUploadingCSV] = useState(false);
+  
+  // Manual student Google email linking state
+  const [linkingStudentId, setLinkingStudentId] = useState<string | null>(null);
+  const [manualEmailInput, setManualEmailInput] = useState("");
   
   // Single Student form inputs
   const [programName, setProgramName] = useState("");
@@ -251,6 +255,30 @@ export default function StudentsManager({
       await refreshDatabaseState();
     } catch (err: any) {
       showToast(`Approval failed: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Manual link email handler
+  const handleManualLinkEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkingStudentId) return;
+    const targetEmail = manualEmailInput.trim().toLowerCase();
+    if (!targetEmail.endsWith("@cunima.ac.mw")) {
+      showToast("Access Restricted: Only official @cunima.ac.mw student Google emails are allowed to connect.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await dbService.linkStudentEmail(linkingStudentId, targetEmail);
+      showToast("Successfully linked student record to Google email.");
+      setLinkingStudentId(null);
+      setManualEmailInput("");
+      await refreshDatabaseState();
+    } catch (err: any) {
+      showToast(`Linkage failed: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -589,6 +617,63 @@ export default function StudentsManager({
         </form>
       )}
 
+      {/* ACTIVE MODAL: MANUAL STUDENT LINKING FORM */}
+      {linkingStudentId && (
+        <form onSubmit={handleManualLinkEmail} className="bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-6 shadow-md space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-amber-100 dark:border-amber-900/20">
+            <div className="flex items-center gap-2">
+              <Link className="w-5 h-5 text-amber-500" />
+              <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
+                Connect Google Email Manually for: <span className="text-amber-700 dark:text-amber-400 font-bold">
+                  {students.find(s => s.id === linkingStudentId)?.first_name} {students.find(s => s.id === linkingStudentId)?.surname}
+                </span>
+              </h3>
+            </div>
+            <button 
+              type="button"
+              onClick={() => { setLinkingStudentId(null); setManualEmailInput(""); }}
+              className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="space-y-2 max-w-md">
+            <label className="text-xs font-semibold text-zinc-500">Google Auth Email Address</label>
+            <div className="relative">
+              <Mail className="w-4 h-4 text-zinc-400 absolute left-3 top-3.5" />
+              <input 
+                type="email"
+                value={manualEmailInput}
+                onChange={(e) => setManualEmailInput(e.target.value)}
+                placeholder="student.name@cunima.ac.mw"
+                className="w-full pl-9 pr-4 py-3.5 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl focus:border-amber-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                required
+              />
+            </div>
+            <p className="text-[10px] text-zinc-400">
+              Only official @cunima.ac.mw Google emails are permitted for validation mapping.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-amber-100 dark:border-amber-900/20">
+            <button
+              type="button"
+              onClick={() => { setLinkingStudentId(null); setManualEmailInput(""); }}
+              className="px-4 py-2 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 text-zinc-500 text-xs font-semibold rounded-full transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 bg-amber-600 hover:bg-amber-750 text-white font-semibold rounded-full shadow-md text-xs transition-colors cursor-pointer"
+            >
+              Connect Email & Verify Profile
+            </button>
+          </div>
+        </form>
+      )}
+
       {/* FILTER CONTROLS BAR */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
         
@@ -687,6 +772,7 @@ export default function StudentsManager({
             <thead>
               <tr className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 font-semibold border-b border-zinc-200 dark:border-zinc-800">
                 <th className="px-5 py-3">Full Student Name</th>
+                <th className="px-5 py-3">Linked Google Email</th>
                 <th className="px-5 py-3">Registration ID</th>
                 <th className="px-5 py-3">Program Course</th>
                 <th className="px-5 py-3 text-center">Year</th>
@@ -698,7 +784,7 @@ export default function StudentsManager({
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
               {currentRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-zinc-400">
+                  <td colSpan={8} className="text-center py-10 text-zinc-400">
                     No student records match the search terms or filters.
                   </td>
                 </tr>
@@ -712,6 +798,17 @@ export default function StudentsManager({
                       <div className="font-semibold text-zinc-950 dark:text-zinc-50">
                         {student.surname}, {student.first_name}
                       </div>
+                    </td>
+
+                    <td className="px-5 py-3.5">
+                      {student.email ? (
+                        <div className="flex items-center gap-1.5 text-[11px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 px-2 py-1 rounded-lg w-fit border border-emerald-100 dark:border-emerald-900/30">
+                          <Mail className="w-3 h-3 text-emerald-500" />
+                          <span>{student.email}</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-zinc-400 italic">Not Connected</span>
+                      )}
                     </td>
 
                     <td className="px-5 py-3.5 font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
@@ -739,6 +836,13 @@ export default function StudentsManager({
                     </td>
 
                     <td className="px-5 py-3.5 text-right flex justify-end gap-1">
+                      <button
+                        onClick={() => { setLinkingStudentId(student.id); setManualEmailInput(student.email || ""); }}
+                        className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20 rounded-lg transition-colors cursor-pointer"
+                        title="Manually connect/edit Google email"
+                      >
+                        <Link className="w-4 h-4" />
+                      </button>
                       {student.status === "pending" && (
                         <button
                           onClick={() => handleApproveStudent(student.id, `${student.first_name} ${student.surname}`)}
