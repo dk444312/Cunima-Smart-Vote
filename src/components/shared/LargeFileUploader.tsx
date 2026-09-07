@@ -46,16 +46,14 @@ export function LargeFileUploader({
       }
 
       // STEP 2: Upload file directly to Cloudflare R2
+      // Note: Extra headers like Content-Type are omitted here so they don't break the AWS SigV4 signature
       setStatus(
         `Uploading ${Math.round(file.size / (1024 * 1024))} MB directly to R2...`
       );
 
       const uploadRes = await fetch(presignedData.uploadUrl, {
         method: "PUT",
-        headers: {
-          "Content-Type": file.type || "application/octet-stream",
-        },
-        body: file, // Streams large file directly to R2
+        body: file,
       });
 
       if (!uploadRes.ok) {
