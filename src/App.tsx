@@ -4,12 +4,51 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { 
-  Menu, Info, Moon, Sun, LogOut, RefreshCw, Copy, TrendingUp, Award, ShieldCheck, Database, Users2, ShieldAlert, Vote, Check, UserCheck, Lock
+import {
+  Menu,
+  Info,
+  Moon,
+  Sun,
+  LogOut,
+  RefreshCw,
+  Copy,
+  TrendingUp,
+  Award,
+  ShieldCheck,
+  Database,
+  Users2,
+  ShieldAlert,
+  Vote,
+  Check,
+  UserCheck,
+  Lock,
+  Megaphone,
+  User,
+  PieChart,
+  Bell,
+  List,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { dbService, isSupabaseConfigured, initializeDatabase, PREMADE_ADMIN, PREMADE_VOTER, PREMADE_MANAGER } from "./lib/supabase.ts";
-import { ElectionRow, VoterRow, VoteRow, LoggedInUser, UpdateRow, UpdateLikeRow, UpdateCommentRow, ClubRow, ClubMemberRow, StudentRow } from "./types.ts";
+import {
+  dbService,
+  isSupabaseConfigured,
+  initializeDatabase,
+  PREMADE_ADMIN,
+  PREMADE_VOTER,
+  PREMADE_MANAGER,
+} from "./lib/supabase.ts";
+import {
+  ElectionRow,
+  VoterRow,
+  VoteRow,
+  LoggedInUser,
+  UpdateRow,
+  UpdateLikeRow,
+  UpdateCommentRow,
+  ClubRow,
+  ClubMemberRow,
+  StudentRow,
+} from "./types.ts";
 import { signInWithGoogle, logoutFirebase } from "./lib/firebase.ts";
 
 // Restructured modular dashboard views
@@ -35,13 +74,21 @@ export default function App() {
   const [clubs, setClubs] = useState<ClubRow[]>([]);
   const [clubMembers, setClubMembers] = useState<ClubMemberRow[]>([]);
   const [updates, setUpdates] = useState<UpdateRow[]>([]);
-  const [updateLikes, setUpdateLikes] = useState<Record<string, UpdateLikeRow[]>>({});
-  const [updateComments, setUpdateComments] = useState<Record<string, UpdateCommentRow[]>>({});
+  const [updateLikes, setUpdateLikes] = useState<
+    Record<string, UpdateLikeRow[]>
+  >({});
+  const [updateComments, setUpdateComments] = useState<
+    Record<string, UpdateCommentRow[]>
+  >({});
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Google Student Registration Form States
-  const [pendingGoogleUser, setPendingGoogleUser] = useState<{ email: string; displayName: string; uid: string } | null>(null);
+  const [pendingGoogleUser, setPendingGoogleUser] = useState<{
+    email: string;
+    displayName: string;
+    uid: string;
+  } | null>(null);
   const [googleRegSuccess, setGoogleRegSuccess] = useState(false);
   const [regFirstName, setRegFirstName] = useState("");
   const [regSurname, setRegSurname] = useState("");
@@ -59,14 +106,16 @@ export default function App() {
     student: StudentRow;
     activeUser: LoggedInUser;
   } | null>(null);
-  const [activeGuardLockUser, setActiveGuardLockUser] = useState<LoggedInUser | null>(null);
+  const [activeGuardLockUser, setActiveGuardLockUser] =
+    useState<LoggedInUser | null>(null);
   const [guardLockPasswordInput, setGuardLockPasswordInput] = useState("");
 
   // Form states for Admin (passed down or handled centrally)
   const [newElectionTitle, setNewElectionTitle] = useState("");
   const [newElectionDesc, setNewElectionDesc] = useState("");
   const [candidateInput, setCandidateInput] = useState("");
-  const [candidates, setCandidates] = useState<string[]>([]);
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [candidatePhoto, setCandidatePhoto] = useState("");
 
   const [newVoterUsername, setNewVoterUsername] = useState("");
   const [newVoterPassword, setNewVoterPassword] = useState("");
@@ -77,13 +126,19 @@ export default function App() {
   const [newClubManagerId, setNewClubManagerId] = useState("");
 
   const [newUpdateContent, setNewUpdateContent] = useState("");
-  const [newCommentContents, setNewCommentContents] = useState<Record<string, string>>({}); // updateId -> commentText
+  const [newCommentContents, setNewCommentContents] = useState<
+    Record<string, string>
+  >({}); // updateId -> commentText
 
   // Navigation state
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeMenu, setActiveMenu] = useState<string>("election");
-  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
-  const [selectedClubIdForManage, setSelectedClubIdForManage] = useState<string | null>(null);
+  const [visiblePasswords, setVisiblePasswords] = useState<
+    Record<string, boolean>
+  >({});
+  const [selectedClubIdForManage, setSelectedClubIdForManage] = useState<
+    string | null
+  >(null);
 
   // Toast messaging
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -97,14 +152,22 @@ export default function App() {
   const refreshDatabaseState = async () => {
     try {
       setIsLoading(true);
-      const [allElections, allVoters, allVotes, allClubs, allClubMembers, allUpdates, allStudents] = await Promise.all([
+      const [
+        allElections,
+        allVoters,
+        allVotes,
+        allClubs,
+        allClubMembers,
+        allUpdates,
+        allStudents,
+      ] = await Promise.all([
         dbService.getElections(),
         dbService.getVoters(),
         dbService.getVotes(),
         dbService.getClubs(),
         dbService.getClubMembers(),
         dbService.getUpdates(),
-        dbService.getStudents()
+        dbService.getStudents(),
       ]);
 
       setElections(allElections);
@@ -123,18 +186,20 @@ export default function App() {
         allUpdates.map(async (upd) => {
           const [likes, comments] = await Promise.all([
             dbService.getUpdateLikes(upd.id),
-            dbService.getUpdateComments(upd.id)
+            dbService.getUpdateComments(upd.id),
           ]);
           likesMap[upd.id] = likes;
           commentsMap[upd.id] = comments;
-        })
+        }),
       );
 
       setUpdateLikes(likesMap);
       setUpdateComments(commentsMap);
     } catch (err: any) {
       console.error("Database connection refresh delay or error:", err);
-      showToast(`Database Delay / Fallback active: ${err.message || "using local cached rows"}`);
+      showToast(
+        `Database Delay / Fallback active: ${err.message || "using local cached rows"}`,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -191,7 +256,11 @@ export default function App() {
 
     // Admin Premade Match
     if (user === PREMADE_ADMIN.username && pass === PREMADE_ADMIN.password) {
-      const adminUser = { id: PREMADE_ADMIN.id, username: PREMADE_ADMIN.username, role: "admin" as const };
+      const adminUser = {
+        id: PREMADE_ADMIN.id,
+        username: PREMADE_ADMIN.username,
+        role: "admin" as const,
+      };
       setCurrentUser(adminUser);
       localStorage.setItem("g_election_active_user", JSON.stringify(adminUser));
       setUsernameInput("");
@@ -201,30 +270,41 @@ export default function App() {
     }
 
     // Check seed / registered voters table
-    const matchedVoter = voters.find(v => v.username.toLowerCase() === user.toLowerCase());
+    const matchedVoter = voters.find(
+      (v) => v.username.toLowerCase() === user.toLowerCase(),
+    );
 
     if (matchedVoter) {
       if (matchedVoter.password === pass) {
         if (matchedVoter.is_blocked) {
-          setLoginError("This user account has been blocked by administrators.");
+          setLoginError(
+            "This user account has been blocked by administrators.",
+          );
           return;
         }
 
-        const voterUser = { 
-          id: matchedVoter.id, 
-          username: matchedVoter.username, 
-          role: matchedVoter.role || "voter" 
+        const voterUser = {
+          id: matchedVoter.id,
+          username: matchedVoter.username,
+          role: matchedVoter.role || "voter",
         };
         setCurrentUser(voterUser);
-        localStorage.setItem("g_election_active_user", JSON.stringify(voterUser));
+        localStorage.setItem(
+          "g_election_active_user",
+          JSON.stringify(voterUser),
+        );
         setUsernameInput("");
         setPasswordInput("");
         showToast(`Access Granted: Welcome back, ${voterUser.username}.`);
       } else {
-        setLoginError("Incorrect password. Please verify your credentials sheet.");
+        setLoginError(
+          "Incorrect password. Please verify your credentials sheet.",
+        );
       }
     } else {
-      setLoginError("Account does not exist. Verify username or contact administrator.");
+      setLoginError(
+        "Account does not exist. Verify username or contact administrator.",
+      );
     }
   };
 
@@ -237,30 +317,41 @@ export default function App() {
 
       const user = await signInWithGoogle();
       if (!user) {
-        throw new Error("Could not fetch user profile from Google Authentication.");
+        throw new Error(
+          "Could not fetch user profile from Google Authentication.",
+        );
       }
 
       const email = user.email || "";
-      const displayName = user.displayName || user.email?.split("@")[0] || "Student Voter";
+      const displayName =
+        user.displayName || user.email?.split("@")[0] || "Student Voter";
 
       // Strict Domain Check: Only @cunima.ac.mw Google emails are allowed
       if (!email.toLowerCase().endsWith("@cunima.ac.mw")) {
-        setLoginError("Access Restricted: Only official @cunima.ac.mw student/staff Google accounts are allowed to authenticate.");
+        setLoginError(
+          "Access Restricted: Only official @cunima.ac.mw student/staff Google accounts are allowed to authenticate.",
+        );
         setIsLoading(false);
         return;
       }
 
       // Check if user is the administrator bypass
-      const isAdminEmail = 
+      const isAdminEmail =
         email.toLowerCase() === "admin@cunima.ac.mw" ||
         email.toLowerCase().startsWith("admin.");
 
       if (isAdminEmail) {
         // Find or create admin voter row
-        let matchedVoter = voters.find(v => v.username.toLowerCase() === email.toLowerCase());
+        let matchedVoter = voters.find(
+          (v) => v.username.toLowerCase() === email.toLowerCase(),
+        );
         if (!matchedVoter) {
           try {
-            matchedVoter = await dbService.insertVoter(email, "firebase_secret", "admin");
+            matchedVoter = await dbService.insertVoter(
+              email,
+              "firebase_secret",
+              "admin",
+            );
             await refreshDatabaseState();
           } catch (dbErr) {
             console.error("Inserting admin voter matched:", dbErr);
@@ -269,10 +360,13 @@ export default function App() {
         const activeUser: LoggedInUser = {
           id: matchedVoter?.id || user.uid,
           username: email,
-          role: "admin"
+          role: "admin",
         };
         setCurrentUser(activeUser);
-        localStorage.setItem("g_election_active_user", JSON.stringify(activeUser));
+        localStorage.setItem(
+          "g_election_active_user",
+          JSON.stringify(activeUser),
+        );
         showToast(`Google Auth Success: Welcome back, Admin ${displayName}.`);
         return;
       }
@@ -280,17 +374,23 @@ export default function App() {
       // Trigger Searching UI
       setIsSearchingProfile(true);
       setCurrentUserDisplay(displayName);
-      setSearchStateMessage("Establishing secure connection to Socrates Database...");
-      await new Promise(resolve => setTimeout(resolve, 700));
+      setSearchStateMessage(
+        "Establishing secure connection to Socrates Database...",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 700));
 
-      setSearchStateMessage(`Parsing name structures from authenticated email "${email}"...`);
-      await new Promise(resolve => setTimeout(resolve, 800));
+      setSearchStateMessage(
+        `Parsing name structures from authenticated email "${email}"...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
-      setSearchStateMessage("Scanning student registry columns for bi-directional similarities...");
-      await new Promise(resolve => setTimeout(resolve, 900));
+      setSearchStateMessage(
+        "Scanning student registry columns for bi-directional similarities...",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 900));
 
       // Check Student Register Database: Check full name and the email address name
-      const matchedStudent = students.find(s => {
+      const matchedStudent = students.find((s) => {
         // 1. Direct Email Match
         if (s.email?.toLowerCase().trim() === email.toLowerCase().trim()) {
           return true;
@@ -298,10 +398,12 @@ export default function App() {
 
         // 2. Parse local part of Google email (e.g., "desire.kandodo" from "desire.kandodo@cunima.ac.mw")
         const emailLocalPart = email.split("@")[0].toLowerCase().trim();
-        
+
         // Split by punctuation to get raw segments (e.g. ["desire", "kandodo"])
-        const emailParts = emailLocalPart.split(/[\._\-]/).filter(p => p.length > 0);
-        
+        const emailParts = emailLocalPart
+          .split(/[\._\-]/)
+          .filter((p) => p.length > 0);
+
         const firstNameLower = s.first_name.toLowerCase().trim();
         const surnameLower = s.surname.toLowerCase().trim();
 
@@ -319,7 +421,10 @@ export default function App() {
         }
 
         // Also check segment intersection (e.g., emailParts has both "desire" and "kandodo" in any order)
-        if (emailParts.includes(cleanFirst) && emailParts.includes(cleanSurname)) {
+        if (
+          emailParts.includes(cleanFirst) &&
+          emailParts.includes(cleanSurname)
+        ) {
           return true;
         }
 
@@ -327,32 +432,48 @@ export default function App() {
       });
 
       if (matchedStudent) {
-        setSearchStateMessage(`Match Identified! Connecting to student profile of "${matchedStudent.first_name} ${matchedStudent.surname}" [${matchedStudent.registration_number}]...`);
-        await new Promise(resolve => setTimeout(resolve, 900));
+        setSearchStateMessage(
+          `Match Identified! Connecting to student profile of "${matchedStudent.first_name} ${matchedStudent.surname}" [${matchedStudent.registration_number}]...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 900));
 
         // Automatically save their Google email to their student record if it's not set
-        if (!matchedStudent.email || matchedStudent.email.toLowerCase() !== email.toLowerCase()) {
+        if (
+          !matchedStudent.email ||
+          matchedStudent.email.toLowerCase() !== email.toLowerCase()
+        ) {
           try {
             await dbService.linkStudentEmail(matchedStudent.id, email);
             await refreshDatabaseState();
           } catch (linkErr) {
-            console.error("Auto linking Google email to student profile failed:", linkErr);
+            console.error(
+              "Auto linking Google email to student profile failed:",
+              linkErr,
+            );
           }
         }
 
         if (matchedStudent.status === "pending") {
-          setLoginError("Your registration application is currently pending administrator approval. Please wait.");
+          setLoginError(
+            "Your registration application is currently pending administrator approval. Please wait.",
+          );
           setIsSearchingProfile(false);
           setIsLoading(false);
           return;
         }
 
         // Student exists and is APPROVED! Let's connect them
-        let matchedVoter = voters.find(v => v.username.toLowerCase() === email.toLowerCase());
+        let matchedVoter = voters.find(
+          (v) => v.username.toLowerCase() === email.toLowerCase(),
+        );
         if (!matchedVoter) {
           try {
             // Auto-create voter account linked to student
-            matchedVoter = await dbService.insertVoter(email, "firebase_secret", "voter");
+            matchedVoter = await dbService.insertVoter(
+              email,
+              "firebase_secret",
+              "voter",
+            );
             await refreshDatabaseState();
           } catch (dbErr) {
             console.error("Auto registration voter failed:", dbErr);
@@ -360,7 +481,9 @@ export default function App() {
         }
 
         if (matchedVoter?.is_blocked) {
-          setLoginError("This student account has been blocked by administrators.");
+          setLoginError(
+            "This student account has been blocked by administrators.",
+          );
           setIsSearchingProfile(false);
           setIsLoading(false);
           return;
@@ -369,21 +492,25 @@ export default function App() {
         const activeUser: LoggedInUser = {
           id: matchedVoter?.id || user.uid,
           username: email,
-          role: matchedVoter?.role || "voter"
+          role: matchedVoter?.role || "voter",
         };
 
         // Intercept immediate login to show identity confirmation details modal
         setPendingIdentityConfirm({
           student: matchedStudent,
-          activeUser
+          activeUser,
         });
         showToast("Profile Match Identified: Please confirm your identity.");
       } else {
-        setSearchStateMessage("No matching student profile found in standard directory database. Redirecting to registration...");
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        setSearchStateMessage(
+          "No matching student profile found in standard directory database. Redirecting to registration...",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         // NOT in database at all! Trigger Student Profile Registration form!
         setPendingGoogleUser({ email, displayName, uid: user.uid });
-        showToast("Student record not found. Please submit your details for verification.");
+        showToast(
+          "Student record not found. Please submit your details for verification.",
+        );
       }
     } catch (err: any) {
       console.error("Google login failure:", err);
@@ -398,7 +525,15 @@ export default function App() {
     e.preventDefault();
     if (!pendingGoogleUser) return;
 
-    if (!regFirstName || !regSurname || !regNumber || !regProgram || !regYear || !regCum || !regGender) {
+    if (
+      !regFirstName ||
+      !regSurname ||
+      !regNumber ||
+      !regProgram ||
+      !regYear ||
+      !regCum ||
+      !regGender
+    ) {
       showToast("Please fill in all student profile registration fields.");
       return;
     }
@@ -414,7 +549,7 @@ export default function App() {
         cum_number: regCum.trim(),
         gender: regGender.trim(),
         email: pendingGoogleUser.email,
-        status: "pending" // Needs to be approved by administrator!
+        status: "pending", // Needs to be approved by administrator!
       });
 
       // Reset fields
@@ -429,7 +564,9 @@ export default function App() {
       // Sync the states
       await refreshDatabaseState();
       setGoogleRegSuccess(true);
-      showToast("Your registration profile has been successfully submitted for administrator approval.");
+      showToast(
+        "Your registration profile has been successfully submitted for administrator approval.",
+      );
     } catch (err: any) {
       showToast(`Registration failure: ${err.message}`);
     } finally {
@@ -457,9 +594,17 @@ export default function App() {
     }
 
     const finalCandidates = [...candidates];
-    if (candidateInput.trim() && !finalCandidates.includes(candidateInput.trim())) {
-      finalCandidates.push(candidateInput.trim());
+    if (
+      candidateInput.trim() &&
+      !finalCandidates.some((c) => (typeof c === "string" ? c : c.name) === candidateInput.trim())
+    ) {
+      if (candidatePhoto) {
+        finalCandidates.push({ name: candidateInput.trim(), photo_url: candidatePhoto });
+      } else {
+        finalCandidates.push(candidateInput.trim());
+      }
     }
+    setCandidatePhoto("");
 
     const slates = finalCandidates.length > 0 ? finalCandidates : ["Yes", "No"];
 
@@ -469,7 +614,7 @@ export default function App() {
         newElectionTitle.trim(),
         newElectionDesc.trim(),
         slates,
-        null
+        null,
       );
       await refreshDatabaseState();
 
@@ -485,7 +630,10 @@ export default function App() {
     }
   };
 
-  const handleUpdateElectionStatus = async (id: string, status: "draft" | "active" | "completed") => {
+  const handleUpdateElectionStatus = async (
+    id: string,
+    status: "draft" | "active" | "completed",
+  ) => {
     try {
       setIsLoading(true);
       await dbService.updateElection(id, { status });
@@ -514,10 +662,12 @@ export default function App() {
   const simulateVotes = async (electionId: string) => {
     try {
       setIsLoading(true);
-      const election = elections.find(e => e.id === electionId);
+      const election = elections.find((e) => e.id === electionId);
       if (!election) return;
 
-      const activeVoters = voters.filter(v => !v.is_blocked && v.role !== "admin");
+      const activeVoters = voters.filter(
+        (v) => !v.is_blocked && v.role !== "admin",
+      );
 
       if (activeVoters.length === 0) {
         showToast("No active voters found in directory to simulate ballots.");
@@ -527,17 +677,22 @@ export default function App() {
       await Promise.all(
         activeVoters.map(async (voter) => {
           try {
-            const randomCandidate = election.candidates[Math.floor(Math.random() * election.candidates.length)];
+            const randomCandidate =
+              election.candidates[
+                Math.floor(Math.random() * election.candidates.length)
+              ];
             await dbService.insertVote(voter.id, electionId, randomCandidate);
           } catch (e) {
             // gracefully skip duplicate voter constraints
           }
-        })
+        }),
       );
 
       await dbService.updateElection(electionId, { status: "completed" });
       await refreshDatabaseState();
-      showToast(`SQL SIMULATION: Distributed random ballot entries to active voter base.`);
+      showToast(
+        `SQL SIMULATION: Distributed random ballot entries to active voter base.`,
+      );
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
@@ -554,13 +709,15 @@ export default function App() {
       await dbService.insertVoter(
         newVoterUsername.trim(),
         newVoterPassword.trim() || "Pass123",
-        newVoterRole as any
+        newVoterRole as any,
       );
       await refreshDatabaseState();
 
       setNewVoterUsername("");
       setNewVoterPassword("");
-      showToast(`SQL INSERT SUCCESS: Created ${newVoterRole === "club_manager" ? "Club Manager" : "Voter"} account.`);
+      showToast(
+        `SQL INSERT SUCCESS: Created ${newVoterRole === "club_manager" ? "Club Manager" : "Voter"} account.`,
+      );
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
@@ -574,7 +731,9 @@ export default function App() {
       setIsLoading(true);
       await dbService.updateVoter(v.id, { role: nextRole });
       await refreshDatabaseState();
-      showToast(`SQL UPDATE SUCCESS: Changed "${v.username}" to ${nextRole === "club_manager" ? "Club Manager" : "Voter"}.`);
+      showToast(
+        `SQL UPDATE SUCCESS: Changed "${v.username}" to ${nextRole === "club_manager" ? "Club Manager" : "Voter"}.`,
+      );
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
@@ -587,7 +746,9 @@ export default function App() {
       setIsLoading(true);
       await dbService.updateVoter(v.id, { is_blocked: !v.is_blocked });
       await refreshDatabaseState();
-      showToast(`SQL UPDATE SUCCESS: ${v.is_blocked ? "Unblocked" : "Blocked"} voter "${v.username}".`);
+      showToast(
+        `SQL UPDATE SUCCESS: ${v.is_blocked ? "Unblocked" : "Blocked"} voter "${v.username}".`,
+      );
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
@@ -613,7 +774,9 @@ export default function App() {
       setIsLoading(true);
       await dbService.updateElection(id, { published });
       await refreshDatabaseState();
-      showToast(`SQL UPDATE SUCCESS: Feed visibility changed to ${published ? "Visible" : "Hidden"}.`);
+      showToast(
+        `SQL UPDATE SUCCESS: Feed visibility changed to ${published ? "Visible" : "Hidden"}.`,
+      );
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
@@ -634,14 +797,16 @@ export default function App() {
       await dbService.insertClub(
         newClubName.trim(),
         newClubDesc.trim() || "No description provided.",
-        newClubManagerId
+        newClubManagerId,
       );
       await refreshDatabaseState();
 
       setNewClubName("");
       setNewClubDesc("");
       setNewClubManagerId("");
-      showToast(`SQL INSERT SUCCESS: New club "${newClubName}" created successfully.`);
+      showToast(
+        `SQL INSERT SUCCESS: New club "${newClubName}" created successfully.`,
+      );
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
@@ -663,9 +828,11 @@ export default function App() {
   };
 
   const handleToggleClubMember = async (clubId: string, voterId: string) => {
-    const existingIds = clubMembers.filter(cm => cm.club_id === clubId).map(cm => cm.voter_id);
+    const existingIds = clubMembers
+      .filter((cm) => cm.club_id === clubId)
+      .map((cm) => cm.voter_id);
     const updatedIds = existingIds.includes(voterId)
-      ? existingIds.filter(id => id !== voterId)
+      ? existingIds.filter((id) => id !== voterId)
       : [...existingIds, voterId];
 
     try {
@@ -681,13 +848,17 @@ export default function App() {
   };
 
   // BROADCAST SOCIAL ACTIONS
-  const handleCreateUpdate = async (e: React.FormEvent) => {
+  const handleCreateUpdate = async (e: React.FormEvent, mediaUrl?: string) => {
     e.preventDefault();
-    if (!newUpdateContent.trim()) return;
+    if (!newUpdateContent.trim() && !mediaUrl) return;
 
     try {
       setIsLoading(true);
-      await dbService.insertUpdate(newUpdateContent.trim(), "Administrator");
+      await dbService.insertUpdate(
+        newUpdateContent.trim(),
+        "Administrator",
+        mediaUrl,
+      );
       await refreshDatabaseState();
       setNewUpdateContent("");
       showToast("SQL BROADCAST SUCCESS: Verified update broadcasted globally.");
@@ -714,7 +885,11 @@ export default function App() {
   const handleToggleLikeUpdate = async (updateId: string) => {
     if (!currentUser) return;
     try {
-      await dbService.toggleLikeUpdate(updateId, currentUser.id, currentUser.username);
+      await dbService.toggleLikeUpdate(
+        updateId,
+        currentUser.id,
+        currentUser.username,
+      );
       await refreshDatabaseState();
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -728,8 +903,13 @@ export default function App() {
     if (!text.trim()) return;
 
     try {
-      await dbService.insertUpdateComment(updateId, currentUser.id, currentUser.username, text.trim());
-      setNewCommentContents(prev => ({ ...prev, [updateId]: "" }));
+      await dbService.insertUpdateComment(
+        updateId,
+        currentUser.id,
+        currentUser.username,
+        text.trim(),
+      );
+      setNewCommentContents((prev) => ({ ...prev, [updateId]: "" }));
       await refreshDatabaseState();
       showToast("SQL COMMENT SUCCESS: Comment post row added.");
     } catch (err: any) {
@@ -738,7 +918,11 @@ export default function App() {
   };
 
   const truncateDatabase = async () => {
-    if (!window.confirm("Are you sure you want to drop and truncate all mock tables data? This action is irreversible.")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to drop and truncate all mock tables data? This action is irreversible.",
+      )
+    ) {
       return;
     }
 
@@ -746,7 +930,9 @@ export default function App() {
       setIsLoading(true);
       await dbService.clearAllData();
       await refreshDatabaseState();
-      showToast("SQL TRUNCATE TRADITIONAL DELEGATION SUCCESS: All table schemas are cleared.");
+      showToast(
+        "SQL TRUNCATE TRADITIONAL DELEGATION SUCCESS: All table schemas are cleared.",
+      );
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
@@ -756,7 +942,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#fafafa] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200 font-sans antialiased flex flex-col">
-      
       {/* GLOBAL BANNER */}
       <header className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 py-3.5 px-6 sticky top-0 z-40 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -769,31 +954,41 @@ export default function App() {
             </h1>
             <p className="text-[10px] text-zinc-400 font-mono flex items-center gap-1">
               <span>CampusVote</span>
-              <span className={`inline-block w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`} />
-              <span>{isSupabaseConfigured ? "CampusVote" : "Local Mock Storage"}</span>
+              <span
+                className={`inline-block w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
+              />
+              <span>
+                {isSupabaseConfigured ? "CampusVote" : "Local Mock Storage"}
+              </span>
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={refreshDatabaseState}
             className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors cursor-pointer"
             title="Refresh tables state"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+            />
           </button>
 
-          <button 
+          <button
             onClick={() => setIsDarkMode(!isDarkMode)}
             className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors cursor-pointer"
             title="Toggle theme appearance"
           >
-            {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {isDarkMode ? (
+              <Sun className="w-4 h-4" />
+            ) : (
+              <Moon className="w-4 h-4" />
+            )}
           </button>
 
           {currentUser && (
-            <button 
+            <button
               onClick={handleLogout}
               className="p-2 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg text-red-500 transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
               title="End active session"
@@ -816,15 +1011,22 @@ export default function App() {
                   <Check className="w-8 h-8" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Profile Submitted!</h3>
+                  <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                    Profile Submitted!
+                  </h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
-                    Thank you! Your verified CUNIMA student profile has been submitted to the platform administrator for approval.
+                    Thank you! Your verified CUNIMA student profile has been
+                    submitted to the platform administrator for approval.
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed font-semibold">
-                    Email address: <span className="font-mono text-blue-600 dark:text-blue-400">{pendingGoogleUser?.email}</span>
+                    Email address:{" "}
+                    <span className="font-mono text-blue-600 dark:text-blue-400">
+                      {pendingGoogleUser?.email}
+                    </span>
                   </p>
                   <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 py-2 px-3 rounded-full border border-amber-100 dark:border-amber-900/30 mt-4 text-[11px] font-medium leading-relaxed">
-                    Status: Pending Verification. You will be connected automatically once approved by the administrator.
+                    Status: Pending Verification. You will be connected
+                    automatically once approved by the administrator.
                   </p>
                 </div>
                 <button
@@ -839,11 +1041,18 @@ export default function App() {
                 </button>
               </div>
             ) : pendingGoogleUser ? (
-              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-5 animate-fadeIn" id="student_registration_form">
+              <div
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-5 animate-fadeIn"
+                id="student_registration_form"
+              >
                 <div>
-                  <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">CUNIMA Student Registration</h3>
+                  <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                    CUNIMA Student Registration
+                  </h3>
                   <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    Your Google account is authenticated, but your student record is not yet in the voter database. Please submit your registration details to the administrator.
+                    Your Google account is authenticated, but your student
+                    record is not yet in the voter database. Please submit your
+                    registration details to the administrator.
                   </p>
                 </div>
 
@@ -854,8 +1063,10 @@ export default function App() {
                 <form onSubmit={handleRegisterSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">First Name</label>
-                      <input 
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                        First Name
+                      </label>
+                      <input
                         type="text"
                         value={regFirstName}
                         onChange={(e) => setRegFirstName(e.target.value)}
@@ -865,8 +1076,10 @@ export default function App() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Surname</label>
-                      <input 
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                        Surname
+                      </label>
+                      <input
                         type="text"
                         value={regSurname}
                         onChange={(e) => setRegSurname(e.target.value)}
@@ -879,8 +1092,10 @@ export default function App() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Registration ID</label>
-                      <input 
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                        Registration ID
+                      </label>
+                      <input
                         type="text"
                         value={regNumber}
                         onChange={(e) => setRegNumber(e.target.value)}
@@ -890,8 +1105,10 @@ export default function App() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">CUM Number</label>
-                      <input 
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                        CUM Number
+                      </label>
+                      <input
                         type="text"
                         value={regCum}
                         onChange={(e) => setRegCum(e.target.value)}
@@ -903,8 +1120,10 @@ export default function App() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Program Course</label>
-                    <input 
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      Program Course
+                    </label>
+                    <input
                       type="text"
                       value={regProgram}
                       onChange={(e) => setRegProgram(e.target.value)}
@@ -916,8 +1135,10 @@ export default function App() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Academic Year</label>
-                      <input 
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                        Academic Year
+                      </label>
+                      <input
                         type="text"
                         value={regYear}
                         onChange={(e) => setRegYear(e.target.value)}
@@ -927,7 +1148,9 @@ export default function App() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Gender</label>
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                        Gender
+                      </label>
                       <select
                         value={regGender}
                         onChange={(e) => setRegGender(e.target.value)}
@@ -967,23 +1190,31 @@ export default function App() {
                   <div className="w-12 h-12 bg-amber-100 dark:bg-amber-950/40 rounded-2xl flex items-center justify-center text-amber-600 mx-auto">
                     <UserCheck className="w-6 h-6 animate-pulse" />
                   </div>
-                  <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">Confirm Your Identity</h2>
+                  <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">
+                    Confirm Your Identity
+                  </h2>
                   <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                    Socrates matching engine found the following student profile connected to your Google credentials. Please verify details before exploring the portal.
+                    Socrates matching engine found the following student profile
+                    connected to your Google credentials. Please verify details
+                    before exploring the portal.
                   </p>
                 </div>
 
                 <div className="space-y-4 font-sans text-xs">
                   <div className="grid grid-cols-2 gap-3.5">
                     <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
-                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">First Name</span>
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
+                        First Name
+                      </span>
                       <p className="font-semibold text-zinc-900 dark:text-zinc-50 text-sm">
                         {pendingIdentityConfirm.student.first_name}
                       </p>
                     </div>
 
                     <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
-                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Surname</span>
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
+                        Surname
+                      </span>
                       <p className="font-semibold text-zinc-900 dark:text-zinc-50 text-sm">
                         {pendingIdentityConfirm.student.surname}
                       </p>
@@ -992,14 +1223,18 @@ export default function App() {
 
                   <div className="grid grid-cols-2 gap-3.5">
                     <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
-                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Registration Number</span>
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
+                        Registration Number
+                      </span>
                       <p className="font-semibold text-zinc-900 dark:text-zinc-50 font-mono text-[13px]">
                         {pendingIdentityConfirm.student.registration_number}
                       </p>
                     </div>
 
                     <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
-                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Academic Year</span>
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
+                        Academic Year
+                      </span>
                       <p className="font-semibold text-zinc-900 dark:text-zinc-50 font-mono">
                         {pendingIdentityConfirm.student.academic_year}
                       </p>
@@ -1007,7 +1242,9 @@ export default function App() {
                   </div>
 
                   <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
-                    <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Registered Program Course</span>
+                    <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
+                      Registered Program Course
+                    </span>
                     <p className="font-semibold text-zinc-900 dark:text-zinc-50">
                       {pendingIdentityConfirm.student.program_name}
                     </p>
@@ -1015,14 +1252,18 @@ export default function App() {
 
                   <div className="grid grid-cols-2 gap-3.5">
                     <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
-                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">CUM Number</span>
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
+                        CUM Number
+                      </span>
                       <p className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-sm">
                         {pendingIdentityConfirm.student.cum_number}
                       </p>
                     </div>
 
                     <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
-                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Connected Google Account</span>
+                      <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
+                        Connected Google Account
+                      </span>
                       <p className="font-semibold text-blue-600 dark:text-blue-400 font-mono truncate">
                         {pendingIdentityConfirm.activeUser.username}
                       </p>
@@ -1049,12 +1290,19 @@ export default function App() {
                         setActiveGuardLockUser(userObj);
                         setPendingIdentityConfirm(null);
                         setGuardLockPasswordInput("");
-                        showToast("Guard Lock Active: Please enter your credential password.");
+                        showToast(
+                          "Guard Lock Active: Please enter your credential password.",
+                        );
                       } else {
                         setCurrentUser(userObj);
-                        localStorage.setItem("g_election_active_user", JSON.stringify(userObj));
+                        localStorage.setItem(
+                          "g_election_active_user",
+                          JSON.stringify(userObj),
+                        );
                         setPendingIdentityConfirm(null);
-                        showToast("Identity Confirmed: Welcome to Socrates Campus Portal.");
+                        showToast(
+                          "Identity Confirmed: Welcome to Socrates Campus Portal.",
+                        );
                       }
                     }}
                     className="flex-1 py-3 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-500/10 transition-all active:scale-95 cursor-pointer text-center"
@@ -1069,37 +1317,55 @@ export default function App() {
                   <div className="w-12 h-12 bg-amber-100 dark:bg-amber-950/40 rounded-2xl flex items-center justify-center text-amber-600 mx-auto">
                     <Lock className="w-6 h-6 animate-bounce" />
                   </div>
-                  <h2 className="text-lg font-bold text-zinc-950 dark:text-zinc-50">🔒 Credential Guard Lock</h2>
+                  <h2 className="text-lg font-bold text-zinc-950 dark:text-zinc-50">
+                    🔒 Credential Guard Lock
+                  </h2>
                   <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                    Your account has active Guard Lock protection. Please enter your secondary voter credential password to access the voting ballots.
+                    Your account has active Guard Lock protection. Please enter
+                    your secondary voter credential password to access the
+                    voting ballots.
                   </p>
                 </div>
 
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  try {
-                    setIsLoading(true);
-                    // Match password in database/localStorage
-                    const votersList = await dbService.getVoters();
-                    const liveV = votersList.find(v => v.id === activeGuardLockUser.id);
-                    if (liveV && liveV.password === guardLockPasswordInput) {
-                      setCurrentUser(activeGuardLockUser);
-                      localStorage.setItem("g_election_active_user", JSON.stringify(activeGuardLockUser));
-                      setActiveGuardLockUser(null);
-                      setGuardLockPasswordInput("");
-                      showToast("Guard Lock Passed: Welcome to Socrates Campus Portal.");
-                    } else {
-                      showToast("Authentication Error: Invalid credential password.");
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      setIsLoading(true);
+                      // Match password in database/localStorage
+                      const votersList = await dbService.getVoters();
+                      const liveV = votersList.find(
+                        (v) => v.id === activeGuardLockUser.id,
+                      );
+                      if (liveV && liveV.password === guardLockPasswordInput) {
+                        setCurrentUser(activeGuardLockUser);
+                        localStorage.setItem(
+                          "g_election_active_user",
+                          JSON.stringify(activeGuardLockUser),
+                        );
+                        setActiveGuardLockUser(null);
+                        setGuardLockPasswordInput("");
+                        showToast(
+                          "Guard Lock Passed: Welcome to Socrates Campus Portal.",
+                        );
+                      } else {
+                        showToast(
+                          "Authentication Error: Invalid credential password.",
+                        );
+                      }
+                    } catch (err: any) {
+                      showToast(`Error: ${err.message}`);
+                    } finally {
+                      setIsLoading(false);
                     }
-                  } catch (err: any) {
-                    showToast(`Error: ${err.message}`);
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }} className="space-y-4">
+                  }}
+                  className="space-y-4"
+                >
                   <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Username / ID</label>
-                    <input 
+                    <label className="text-[10px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
+                      Username / ID
+                    </label>
+                    <input
                       type="text"
                       value={activeGuardLockUser.username}
                       disabled
@@ -1108,11 +1374,15 @@ export default function App() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Guard Passcode / Password</label>
-                    <input 
+                    <label className="text-[10px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
+                      Guard Passcode / Password
+                    </label>
+                    <input
                       type="password"
                       value={guardLockPasswordInput}
-                      onChange={(e) => setGuardLockPasswordInput(e.target.value)}
+                      onChange={(e) =>
+                        setGuardLockPasswordInput(e.target.value)
+                      }
                       placeholder="Enter guard password"
                       className="w-full px-4 py-3 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-amber-500 focus:outline-none text-xs font-semibold text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 font-mono"
                       required
@@ -1153,17 +1423,28 @@ export default function App() {
                   </div>
 
                   <div className="space-y-1">
-                    <h3 className="text-lg font-semibold text-[#1a73e8] dark:text-blue-400">Matching Profile...</h3>
-                    <p className="text-xs text-zinc-400">Authenticated as <strong className="text-zinc-700 dark:text-zinc-300">{currentUserDisplay}</strong></p>
+                    <h3 className="text-lg font-semibold text-[#1a73e8] dark:text-blue-400">
+                      Matching Profile...
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Authenticated as{" "}
+                      <strong className="text-zinc-700 dark:text-zinc-300">
+                        {currentUserDisplay}
+                      </strong>
+                    </p>
                   </div>
                 </div>
 
                 <div className="p-4 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-zinc-900/50 font-mono text-[11px] text-left space-y-2 text-zinc-600 dark:text-zinc-400">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase">Registry Scanner Active</span>
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase">
+                      Registry Scanner Active
+                    </span>
                   </div>
-                  <p className="font-semibold text-blue-600 dark:text-blue-400 animate-pulse">{searchStateMessage}</p>
+                  <p className="font-semibold text-blue-600 dark:text-blue-400 animate-pulse">
+                    {searchStateMessage}
+                  </p>
                 </div>
 
                 <div className="text-[10px] text-zinc-400 font-mono">
@@ -1176,9 +1457,12 @@ export default function App() {
                   <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-2xl flex items-center justify-center text-blue-600 mx-auto">
                     <ShieldCheck className="w-6 h-6" />
                   </div>
-                  <h2 className="text-2xl font-normal text-zinc-950 dark:text-zinc-50">CUNIMA Voter Portal</h2>
+                  <h2 className="text-2xl font-normal text-zinc-950 dark:text-zinc-50">
+                    CUNIMA Voter Portal
+                  </h2>
                   <p className="text-xs text-zinc-400 max-w-xs mx-auto">
-                    Socrates campus elections portal. Sign in with your official university account to access active ballots.
+                    Socrates campus elections portal. Sign in with your official
+                    university account to access active ballots.
                   </p>
                 </div>
 
@@ -1198,11 +1482,27 @@ export default function App() {
                     className="w-full py-3.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-sm rounded-full flex items-center justify-center gap-2.5 shadow-lg shadow-blue-500/15 border-none transition-all active:scale-95 cursor-pointer"
                     id="btn_google_signin"
                   >
-                    <svg className="w-4 h-4 filter brightness-0 invert" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                    <svg
+                      className="w-4 h-4 filter brightness-0 invert"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        fill="#4285F4"
+                      />
+                      <path
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        fill="#34A853"
+                      />
+                      <path
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                        fill="#FBBC05"
+                      />
+                      <path
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                        fill="#EA4335"
+                      />
                     </svg>
                     <span>Sign In with @cunima.ac.mw Google</span>
                   </button>
@@ -1217,8 +1517,10 @@ export default function App() {
 
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-zinc-500">Username</label>
-                    <input 
+                    <label className="text-xs font-semibold text-zinc-500">
+                      Username
+                    </label>
+                    <input
                       type="text"
                       value={usernameInput}
                       onChange={(e) => setUsernameInput(e.target.value)}
@@ -1230,7 +1532,9 @@ export default function App() {
 
                   <div className="space-y-1">
                     <div className="flex justify-between items-center">
-                      <label className="text-xs font-semibold text-zinc-500">Password</label>
+                      <label className="text-xs font-semibold text-zinc-500">
+                        Password
+                      </label>
                       <button
                         type="button"
                         onClick={() => setIsPasswordVisible(!isPasswordVisible)}
@@ -1239,7 +1543,7 @@ export default function App() {
                         {isPasswordVisible ? "Hide" : "Show"}
                       </button>
                     </div>
-                    <input 
+                    <input
                       type={isPasswordVisible ? "text" : "password"}
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}
@@ -1249,12 +1553,14 @@ export default function App() {
                     />
                   </div>
 
-                  <button 
+                  <button
                     type="submit"
                     disabled={isLoading}
                     className="w-full py-2.5 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 font-semibold text-sm rounded-full transition-all active:scale-95 cursor-pointer"
                   >
-                    {isLoading ? "Validating Session..." : "Verify Username & Password"}
+                    {isLoading
+                      ? "Validating Session..."
+                      : "Verify Username & Password"}
                   </button>
                 </form>
 
@@ -1265,28 +1571,45 @@ export default function App() {
                   </span>
 
                   <div className="grid grid-cols-3 gap-2 text-[11px] font-semibold text-zinc-500">
-                    <button 
-                      onClick={() => { setUsernameInput("admin"); setPasswordInput("admin"); }}
+                    <button
+                      onClick={() => {
+                        setUsernameInput("admin");
+                        setPasswordInput("admin");
+                      }}
                       className="p-2 bg-zinc-50 dark:bg-zinc-800/40 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-center border border-zinc-200/60 dark:border-zinc-800/60 transition-all cursor-pointer"
                     >
-                      <span className="block text-zinc-800 dark:text-zinc-200 font-bold">Admin Panel</span>
-                      <span className="text-[10px] text-zinc-400 font-mono">admin / admin</span>
+                      <span className="block text-zinc-800 dark:text-zinc-200 font-bold">
+                        Admin Panel
+                      </span>
+                      <span className="text-[10px] text-zinc-400 font-mono">
+                        admin / admin
+                      </span>
                     </button>
 
-                    <button 
-                      onClick={() => { setUsernameInput("manager"); setPasswordInput("manager"); }}
+                    <button
+                      onClick={() => {
+                        setUsernameInput("manager");
+                        setPasswordInput("manager");
+                      }}
                       className="p-2 bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/50 dark:hover:bg-purple-900/20 rounded-full text-center border border-purple-200/60 dark:border-purple-900/60 transition-all cursor-pointer text-purple-700 dark:text-purple-300"
                     >
                       <span className="block font-bold">Club Manager</span>
-                      <span className="text-[10px] text-purple-400 font-mono">manager / manager</span>
+                      <span className="text-[10px] text-purple-400 font-mono">
+                        manager / manager
+                      </span>
                     </button>
 
-                    <button 
-                      onClick={() => { setUsernameInput("voter"); setPasswordInput("voter"); }}
+                    <button
+                      onClick={() => {
+                        setUsernameInput("voter");
+                        setPasswordInput("voter");
+                      }}
                       className="p-2 bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-100/50 dark:hover:bg-blue-900/20 rounded-full text-center border border-blue-200/60 dark:border-blue-900/60 transition-all cursor-pointer text-blue-700 dark:text-blue-300"
                     >
                       <span className="block font-bold">Voter Card</span>
-                      <span className="text-[10px] text-blue-400 font-mono">voter / voter</span>
+                      <span className="text-[10px] text-blue-400 font-mono">
+                        voter / voter
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -1296,185 +1619,284 @@ export default function App() {
         ) : (
           /* ================== LOGGED-IN MULTI-DASHBOARD VIEWS ================== */
           <div className="flex-1 flex flex-col md:flex-row">
-            
             {/* SIDEBAR FOR ALL ROLES */}
-            <aside className={`w-full md:w-64 bg-[#0B1E40] text-white flex flex-col justify-between ${isSidebarOpen ? "block" : "hidden md:flex"}`}>
+            <aside
+              className={`w-full md:w-64 bg-[#0B1E40] text-white flex flex-col justify-between ${isSidebarOpen ? "block" : "hidden md:flex"}`}
+            >
               <div className="p-4 space-y-6">
                 <span className="text-xs font-bold tracking-wider text-blue-300 uppercase font-mono block px-3">
-                  {currentUser.role === "admin" ? "Admin Workspace" : currentUser.role === "club_manager" ? "Club Management" : "Voter Portal"}
+                  {currentUser.role === "admin"
+                    ? "Admin Workspace"
+                    : currentUser.role === "club_manager"
+                      ? "Club Management"
+                      : "Voter Portal"}
                 </span>
 
                 <nav className="space-y-1">
                   {currentUser.role === "admin" && (
                     <>
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("election")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "election" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "election"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>Public Elections</span>
+                        <div className="flex items-center gap-2.5">
+                          <Vote className="w-4 h-4" />
+                          <span>Public Elections</span>
+                        </div>
                         <span className="bg-blue-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                          {elections.filter(e => !e.club_id).length}
+                          {elections.filter((e) => !e.club_id).length}
                         </span>
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("voters")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "voters" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "voters"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>Manage Users</span>
+                        <div className="flex items-center gap-2.5">
+                          <Users2 className="w-4 h-4" />
+                          <span>Manage Users</span>
+                        </div>
                         <span className="bg-blue-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
                           {voters.length}
                         </span>
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("clubs")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "clubs" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "clubs"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>Student Clubs</span>
+                        <div className="flex items-center gap-2.5">
+                          <Award className="w-4 h-4" />
+                          <span>Student Clubs</span>
+                        </div>
                         <span className="bg-blue-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
                           {clubs.length}
                         </span>
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("results")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "results" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "results"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>Publish Feed</span>
+                        <div className="flex items-center gap-2.5">
+                          <List className="w-4 h-4" />
+                          <span>Publish Feed</span>
+                        </div>
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("updates")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "updates" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "updates"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>Broadcast Socials</span>
+                        <div className="flex items-center gap-2.5">
+                          <Megaphone className="w-4 h-4" />
+                          <span>Broadcast Socials</span>
+                        </div>
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("profile")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "profile" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "profile"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>My Profile</span>
+                        <div className="flex items-center gap-2.5">
+                          <User className="w-4 h-4" />
+                          <span>My Profile</span>
+                        </div>
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("students")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "students" ? "bg-emerald-500/20 text-emerald-300 font-bold" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "students"
+                            ? "bg-emerald-500/20 text-emerald-300 font-bold"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>Students Database</span>
+                        <div className="flex items-center gap-2.5">
+                          <Database className="w-4 h-4" />
+                          <span>Students Database</span>
+                        </div>
                         <span className="bg-emerald-900/50 text-[10px] px-2 py-0.5 rounded-full font-bold text-emerald-300">
                           {students.length}
                         </span>
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("verified")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "verified" ? "bg-emerald-500/20 text-emerald-300 font-bold animate-pulse" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "verified"
+                            ? "bg-emerald-500/20 text-emerald-300 font-bold animate-pulse"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>Verified (Connected)</span>
+                        <div className="flex items-center gap-2.5">
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>Verified (Connected)</span>
+                        </div>
                         <span className="bg-emerald-900/50 text-[10px] px-2 py-0.5 rounded-full font-bold text-emerald-300">
-                          {voters.filter(v => students.some(s => s.email && s.email.toLowerCase() === v.username.toLowerCase())).length}
+                          {
+                            voters.filter((v) =>
+                              students.some(
+                                (s) =>
+                                  s.email &&
+                                  s.email.toLowerCase() ===
+                                    v.username.toLowerCase(),
+                              ),
+                            ).length
+                          }
                         </span>
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("sql_db")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "sql_db" ? "bg-purple-500/20 text-purple-300" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "sql_db"
+                            ? "bg-purple-500/20 text-purple-300"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>SQL DB Inspector</span>
+                        <div className="flex items-center gap-2.5">
+                          <Database className="w-4 h-4" />
+                          <span>SQL DB Inspector</span>
+                        </div>
                       </button>
                     </>
                   )}
 
                   {currentUser.role === "club_manager" && (
                     <>
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("club_elections")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "club_elections" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "club_elections"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>My Club Elections</span>
+                        <div className="flex items-center gap-2.5">
+                          <Vote className="w-4 h-4" />
+                          <span>My Club Elections</span>
+                        </div>
                       </button>
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("club_members")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "club_members" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "club_members"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>Club Roster</span>
+                        <div className="flex items-center gap-2.5">
+                          <Users2 className="w-4 h-4" />
+                          <span>Club Roster</span>
+                        </div>
                       </button>
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("feed")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "feed" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "feed"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>Elections Feed</span>
+                        <div className="flex items-center gap-2.5">
+                          <List className="w-4 h-4" />
+                          <span>Elections Feed</span>
+                        </div>
                       </button>
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("profile")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "profile" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "profile"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>My Profile</span>
+                        <div className="flex items-center gap-2.5">
+                          <User className="w-4 h-4" />
+                          <span>My Profile</span>
+                        </div>
                       </button>
                     </>
                   )}
 
                   {currentUser.role === "voter" && (
                     <>
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("ballot")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "ballot" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "ballot"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>My Ballots</span>
+                        <div className="flex items-center gap-2.5">
+                          <Vote className="w-4 h-4" />
+                          <span>My Ballots</span>
+                        </div>
                       </button>
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("results")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "results" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "results"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>Election Results</span>
+                        <div className="flex items-center gap-2.5">
+                          <PieChart className="w-4 h-4" />
+                          <span>Election Results</span>
+                        </div>
                       </button>
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("updates")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "updates" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "updates"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>Election Updates</span>
+                        <div className="flex items-center gap-2.5">
+                          <Bell className="w-4 h-4" />
+                          <span>Election Updates</span>
+                        </div>
                       </button>
-                      <button 
+                      <button
                         onClick={() => setActiveMenu("profile")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "profile" ? "bg-white/20 text-white" : "text-blue-100 hover:bg-white/10"
+                          activeMenu === "profile"
+                            ? "bg-white/20 text-white"
+                            : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
-                        <span>My Profile</span>
+                        <div className="flex items-center gap-2.5">
+                          <User className="w-4 h-4" />
+                          <span>My Profile</span>
+                        </div>
                       </button>
                     </>
                   )}
@@ -1488,11 +1910,10 @@ export default function App() {
 
             {/* MAIN PORTLET CONTAINER */}
             <main className="flex-1 p-6 md:p-8 max-w-6xl mx-auto w-full overflow-y-auto">
-              
               {isLoading && (
                 <div className="mb-4 p-3 rounded-full bg-blue-50/50 dark:bg-blue-950/10 text-blue-600 dark:text-blue-400 text-xs font-mono flex items-center gap-2 border border-blue-100 dark:border-blue-900/20">
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Syncing state with Supabase servers...</span>
+                  <span>Syncing state with servers...</span>
                 </div>
               )}
 
@@ -1520,6 +1941,8 @@ export default function App() {
                   candidateInput={candidateInput}
                   setCandidateInput={setCandidateInput}
                   candidates={candidates}
+                  candidatePhoto={candidatePhoto}
+                  setCandidatePhoto={setCandidatePhoto}
                   setCandidates={setCandidates}
                   handleCreateElection={handleCreateElection}
                   newVoterUsername={newVoterUsername}
@@ -1605,7 +2028,6 @@ export default function App() {
                   activeTab={activeMenu}
                 />
               )}
-
             </main>
           </div>
         )}
@@ -1614,7 +2036,7 @@ export default function App() {
       {/* FLOATING TOAST FEEDBACK */}
       <AnimatePresence>
         {toastMessage && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 30 }}
@@ -1625,7 +2047,6 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-
     </div>
   );
 }

@@ -1,6 +1,13 @@
 import React from "react";
 import { Sparkles, Check, Trash2, Heart, MessageCircle } from "lucide-react";
-import { LoggedInUser, UpdateRow, UpdateLikeRow, UpdateCommentRow } from "../../types.ts";
+import { LargeFileUploader } from "./LargeFileUploader.tsx";
+import { useState } from "react";
+import {
+  LoggedInUser,
+  UpdateRow,
+  UpdateLikeRow,
+  UpdateCommentRow,
+} from "../../types.ts";
 
 interface UpdatesFeedProps {
   currentUser: LoggedInUser | null;
@@ -9,11 +16,13 @@ interface UpdatesFeedProps {
   updateComments: Record<string, UpdateCommentRow[]>;
   newUpdateContent: string;
   setNewUpdateContent: (val: string) => void;
-  handleCreateUpdate: (e: React.FormEvent) => void;
+  handleCreateUpdate: (e: React.FormEvent, mediaUrl?: string) => void;
   handleDeleteUpdate: (id: string) => void;
   handleToggleLikeUpdate: (id: string) => void;
   newCommentContents: Record<string, string>;
-  setNewCommentContents: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setNewCommentContents: React.Dispatch<
+    React.SetStateAction<Record<string, string>>
+  >;
   handlePostComment: (e: React.FormEvent, updateId: string) => void;
   isAdmin: boolean;
 }
@@ -31,8 +40,9 @@ export default function UpdatesFeed({
   newCommentContents,
   setNewCommentContents,
   handlePostComment,
-  isAdmin
+  isAdmin,
 }: UpdatesFeedProps) {
+  const [mediaUrl, setMediaUrl] = useState("");
   return (
     <div className="space-y-6">
       {/* COMPOSER (Admin Only) */}
@@ -47,7 +57,13 @@ export default function UpdatesFeed({
             </span>
           </div>
 
-          <form onSubmit={handleCreateUpdate} className="space-y-3">
+          <form
+            onSubmit={(e) => {
+              handleCreateUpdate(e, mediaUrl);
+              setMediaUrl("");
+            }}
+            className="space-y-3"
+          >
             <textarea
               value={newUpdateContent}
               onChange={(e) => setNewUpdateContent(e.target.value)}
@@ -55,13 +71,24 @@ export default function UpdatesFeed({
               className="w-full h-24 p-4 text-sm bg-transparent border border-zinc-200 dark:border-zinc-800 focus:border-[#1a73e8] dark:focus:border-blue-500 focus:outline-none rounded-xl text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 resize-none"
               required
             />
+            <div className="mb-3">
+              <LargeFileUploader
+                onUploadSuccess={(url) => setMediaUrl(url)}
+                label="Attach Photo/Video"
+              />
+              {mediaUrl && (
+                <div className="text-[10px] text-emerald-500 mt-1 font-semibold">
+                  Media successfully attached!
+                </div>
+              )}
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-zinc-400 font-mono">
                 This post will immediately broadcast to all voter portals.
               </span>
               <button
                 type="submit"
-                disabled={!newUpdateContent.trim()}
+                disabled={!newUpdateContent.trim() && !mediaUrl}
                 className="px-5 py-2 bg-[#1a73e8] hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs rounded-full shadow-sm transition-all active:scale-95 cursor-pointer"
               >
                 Publish Broadcast
@@ -76,19 +103,27 @@ export default function UpdatesFeed({
         {updates.length === 0 ? (
           <div className="p-12 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl">
             <Sparkles className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">No Election Updates Yet</h3>
+            <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
+              No Election Updates Yet
+            </h3>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto mt-1">
-              Administrators haven't broadcasted any updates to the channel yet. Stay tuned!
+              Administrators haven't broadcasted any updates to the channel yet.
+              Stay tuned!
             </p>
           </div>
         ) : (
           updates.map((upd) => {
             const likes = updateLikes[upd.id] || [];
             const comments = updateComments[upd.id] || [];
-            const hasLiked = currentUser ? likes.some(l => l.user_id === currentUser.id) : false;
+            const hasLiked = currentUser
+              ? likes.some((l) => l.user_id === currentUser.id)
+              : false;
 
             return (
-              <div key={upd.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4">
+              <div
+                key={upd.id}
+                className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4"
+              >
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center font-bold text-xs text-[#1a73e8]">
@@ -99,7 +134,10 @@ export default function UpdatesFeed({
                         <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-50">
                           {upd.author}
                         </span>
-                        <span className="inline-flex items-center justify-center bg-[#0095F6] text-white rounded-full w-4 h-4 shadow-sm" title="Meta Verified Admin">
+                        <span
+                          className="inline-flex items-center justify-center bg-[#0095F6] text-white rounded-full w-4 h-4 shadow-sm"
+                          title="Meta Verified Admin"
+                        >
                           <Check className="w-2.5 h-2.5 stroke-[4.5px]" />
                         </span>
                         <span className="text-[10px] bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold border border-blue-100 dark:border-blue-900/20">
@@ -131,18 +169,25 @@ export default function UpdatesFeed({
                   <button
                     onClick={() => handleToggleLikeUpdate(upd.id)}
                     className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
-                      hasLiked 
-                        ? "text-red-500 font-semibold" 
+                      hasLiked
+                        ? "text-red-500 font-semibold"
                         : "text-zinc-500 hover:text-red-500"
                     }`}
                   >
-                    <Heart className={`w-4 h-4 ${hasLiked ? "fill-red-500 text-red-500" : ""}`} />
-                    <span>{likes.length} {likes.length === 1 ? "Like" : "Likes"}</span>
+                    <Heart
+                      className={`w-4 h-4 ${hasLiked ? "fill-red-500 text-red-500" : ""}`}
+                    />
+                    <span>
+                      {likes.length} {likes.length === 1 ? "Like" : "Likes"}
+                    </span>
                   </button>
 
                   <div className="flex items-center gap-1.5 text-zinc-505">
                     <MessageCircle className="w-4 h-4" />
-                    <span>{comments.length} {comments.length === 1 ? "Comment" : "Comments"}</span>
+                    <span>
+                      {comments.length}{" "}
+                      {comments.length === 1 ? "Comment" : "Comments"}
+                    </span>
                   </div>
                 </div>
 
@@ -150,7 +195,8 @@ export default function UpdatesFeed({
                   {comments.length > 0 && (
                     <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                       {comments.map((c) => {
-                        const isCommentAdmin = c.username.toLowerCase() === "admin";
+                        const isCommentAdmin =
+                          c.username.toLowerCase() === "admin";
                         return (
                           <div key={c.id} className="flex gap-2.5">
                             <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center font-bold text-[9px] text-zinc-600 dark:text-zinc-300 flex-shrink-0">
@@ -163,7 +209,10 @@ export default function UpdatesFeed({
                                 </span>
                                 {isCommentAdmin && (
                                   <div className="flex items-center gap-1">
-                                    <span className="inline-flex items-center justify-center bg-[#0095F6] text-white rounded-full w-3.5 h-3.5 shadow-sm" title="Meta Verified Admin">
+                                    <span
+                                      className="inline-flex items-center justify-center bg-[#0095F6] text-white rounded-full w-3.5 h-3.5 shadow-sm"
+                                      title="Meta Verified Admin"
+                                    >
                                       <Check className="w-2 h-2 stroke-[4.5px]" />
                                     </span>
                                     <span className="text-[9px] bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 px-1.5 py-0.2 rounded font-bold">
@@ -172,10 +221,15 @@ export default function UpdatesFeed({
                                   </div>
                                 )}
                                 <span className="text-[9px] text-zinc-400 font-mono">
-                                  {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  {new Date(c.created_at).toLocaleTimeString(
+                                    [],
+                                    { hour: "2-digit", minute: "2-digit" },
+                                  )}
                                 </span>
                               </div>
-                              <p className="text-zinc-700 dark:text-zinc-300 leading-normal">{c.content}</p>
+                              <p className="text-zinc-700 dark:text-zinc-300 leading-normal">
+                                {c.content}
+                              </p>
                             </div>
                           </div>
                         );
@@ -184,14 +238,19 @@ export default function UpdatesFeed({
                   )}
 
                   {currentUser && (
-                    <form 
+                    <form
                       onSubmit={(e) => handlePostComment(e, upd.id)}
                       className="flex gap-2 pt-1"
                     >
                       <input
                         type="text"
                         value={newCommentContents[upd.id] || ""}
-                        onChange={(e) => setNewCommentContents(prev => ({ ...prev, [upd.id]: e.target.value }))}
+                        onChange={(e) =>
+                          setNewCommentContents((prev) => ({
+                            ...prev,
+                            [upd.id]: e.target.value,
+                          }))
+                        }
                         placeholder="Write a supportive comment..."
                         className="flex-1 px-4 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 focus:border-[#1a73e8] dark:focus:border-blue-500 focus:outline-none rounded-xl text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
                         required

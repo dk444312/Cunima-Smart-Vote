@@ -1,5 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+} from "firebase/auth";
 
 // Firebase Configuration requested by user
 const firebaseConfig = {
@@ -9,7 +14,7 @@ const firebaseConfig = {
   storageBucket: "campusvote-5f805.firebasestorage.app",
   messagingSenderId: "940183018658",
   appId: "1:940183018658:web:e42da320af1dc17cb4cbfb",
-  measurementId: "G-DMJH12MCF2"
+  measurementId: "G-DMJH12MCF2",
 };
 
 // Initialize Firebase App

@@ -1,6 +1,20 @@
 import React, { useState, useRef } from "react";
-import { 
-  Upload, Plus, Search, Trash2, FileSpreadsheet, AlertCircle, CheckCircle2, X, Filter, Sparkles, ChevronLeft, ChevronRight, Users2, Link, Mail
+import {
+  Upload,
+  Plus,
+  Search,
+  Trash2,
+  FileSpreadsheet,
+  AlertCircle,
+  CheckCircle2,
+  X,
+  Filter,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Users2,
+  Link,
+  Mail,
 } from "lucide-react";
 import { StudentRow } from "../../types.ts";
 import { dbService } from "../../lib/supabase.ts";
@@ -16,16 +30,16 @@ export default function StudentsManager({
   students,
   refreshDatabaseState,
   showToast,
-  setIsLoading
+  setIsLoading,
 }: StudentsManagerProps) {
   // Modal / Form trigger states
   const [isAddingSingle, setIsAddingSingle] = useState(false);
   const [isUploadingCSV, setIsUploadingCSV] = useState(false);
-  
+
   // Manual student Google email linking state
   const [linkingStudentId, setLinkingStudentId] = useState<string | null>(null);
   const [manualEmailInput, setManualEmailInput] = useState("");
-  
+
   // Single Student form inputs
   const [programName, setProgramName] = useState("");
   const [academicYear, setAcademicYear] = useState("");
@@ -39,7 +53,10 @@ export default function StudentsManager({
   const [dragActive, setDragActive] = useState(false);
   const [csvText, setCsvText] = useState("");
   const [previewRows, setPreviewRows] = useState<any[]>([]);
-  const [importLogs, setImportLogs] = useState<{ success?: string; error?: string } | null>(null);
+  const [importLogs, setImportLogs] = useState<{
+    success?: string;
+    error?: string;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Table search & filter states
@@ -47,20 +64,34 @@ export default function StudentsManager({
   const [programFilter, setProgramFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
   const [genderFilter, setGenderFilter] = useState("all");
-  const [activeSubTab, setActiveSubTab] = useState<"verified" | "pending">("verified");
+  const [activeSubTab, setActiveSubTab] = useState<"verified" | "pending">(
+    "verified",
+  );
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
   // Derive unique programs & years for filter dropdowns
-  const uniquePrograms = Array.from(new Set(students.map(s => s.program_name))).filter(Boolean);
-  const uniqueYears = Array.from(new Set(students.map(s => s.academic_year))).filter(Boolean);
+  const uniquePrograms = Array.from(
+    new Set(students.map((s) => s.program_name)),
+  ).filter(Boolean);
+  const uniqueYears = Array.from(
+    new Set(students.map((s) => s.academic_year)),
+  ).filter(Boolean);
 
   // Handle single student submit
   const handleSingleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!programName || !academicYear || !registrationNumber || !cumNumber || !surname || !firstName || !gender) {
+    if (
+      !programName ||
+      !academicYear ||
+      !registrationNumber ||
+      !cumNumber ||
+      !surname ||
+      !firstName ||
+      !gender
+    ) {
       showToast("Please fill in all student properties.");
       return;
     }
@@ -74,10 +105,10 @@ export default function StudentsManager({
         cum_number: cumNumber.trim(),
         surname: surname.trim(),
         first_name: firstName.trim(),
-        gender: gender.trim()
+        gender: gender.trim(),
       });
       showToast(`Student ${firstName} ${surname} created successfully!`);
-      
+
       // Reset form & state
       setProgramName("");
       setAcademicYear("");
@@ -98,7 +129,7 @@ export default function StudentsManager({
 
   // Safe manual CSV string parser
   const parseCSVText = (text: string) => {
-    const rows = text.split("\n").map(line => {
+    const rows = text.split("\n").map((line) => {
       // Split by comma but respect quotes
       const result: string[] = [];
       let current = "";
@@ -118,22 +149,29 @@ export default function StudentsManager({
       return result;
     });
 
-    return rows.filter(r => r.length > 1 && r.some(cell => cell !== ""));
+    return rows.filter((r) => r.length > 1 && r.some((cell) => cell !== ""));
   };
 
   // Handle CSV file loader
   const processCSVFile = (text: string) => {
     const rawRows = parseCSVText(text);
     if (rawRows.length < 2) {
-      setImportLogs({ error: "CSV must contain at least a header row and one student data row." });
+      setImportLogs({
+        error:
+          "CSV must contain at least a header row and one student data row.",
+      });
       return;
     }
 
     // Auto-detect index mapping of headers
-    const headers = rawRows[0].map(h => h.toLowerCase().replace(/_/g, " ").trim());
-    
+    const headers = rawRows[0].map((h) =>
+      h.toLowerCase().replace(/_/g, " ").trim(),
+    );
+
     const findIndex = (aliases: string[]) => {
-      return headers.findIndex(h => aliases.some(alias => h.includes(alias)));
+      return headers.findIndex((h) =>
+        aliases.some((alias) => h.includes(alias)),
+      );
     };
 
     const mapping = {
@@ -143,21 +181,25 @@ export default function StudentsManager({
       cum: findIndex(["cum", "cum number", "gpa", "cumulative"]),
       surname: findIndex(["surname", "last name", "lastname"]),
       firstName: findIndex(["first name", "firstname", "name"]),
-      gender: findIndex(["gender", "sex"])
+      gender: findIndex(["gender", "sex"]),
     };
 
     // Parse records
     const parsedData = rawRows.slice(1).map((row) => {
-      const getVal = (idx: number, fallback: string = "") => idx >= 0 && row[idx] ? row[idx] : fallback;
-      
+      const getVal = (idx: number, fallback: string = "") =>
+        idx >= 0 && row[idx] ? row[idx] : fallback;
+
       return {
         program_name: getVal(mapping.program, "General Program"),
         academic_year: getVal(mapping.year, "2026/2027"),
-        registration_number: getVal(mapping.reg, "REG_" + Math.floor(Math.random() * 1000000)),
+        registration_number: getVal(
+          mapping.reg,
+          "REG_" + Math.floor(Math.random() * 1000000),
+        ),
         cum_number: getVal(mapping.cum, "0"),
         surname: getVal(mapping.surname, "Unknown"),
         first_name: getVal(mapping.firstName, "Student"),
-        gender: getVal(mapping.gender, "M")
+        gender: getVal(mapping.gender, "M"),
       };
     });
 
@@ -215,14 +257,20 @@ export default function StudentsManager({
     try {
       setIsLoading(true);
       await dbService.importStudentsBulk(previewRows);
-      showToast(`Successfully processed and merged ${previewRows.length} student records.`);
-      setImportLogs({ success: `Merged ${previewRows.length} students into active database.` });
+      showToast(
+        `Successfully processed and merged ${previewRows.length} student records.`,
+      );
+      setImportLogs({
+        success: `Merged ${previewRows.length} students into active database.`,
+      });
       setPreviewRows([]);
       setCsvText("");
       setIsUploadingCSV(false);
       await refreshDatabaseState();
     } catch (err: any) {
-      setImportLogs({ error: `Import failed: ${err.message || "Unique conflict on registration number keys."}` });
+      setImportLogs({
+        error: `Import failed: ${err.message || "Unique conflict on registration number keys."}`,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -266,7 +314,9 @@ export default function StudentsManager({
     if (!linkingStudentId) return;
     const targetEmail = manualEmailInput.trim().toLowerCase();
     if (!targetEmail.endsWith("@cunima.ac.mw")) {
-      showToast("Access Restricted: Only official @cunima.ac.mw student Google emails are allowed to connect.");
+      showToast(
+        "Access Restricted: Only official @cunima.ac.mw student Google emails are allowed to connect.",
+      );
       return;
     }
 
@@ -285,36 +335,48 @@ export default function StudentsManager({
   };
 
   // Filter & Search computation
-  const filteredStudents = students.filter(s => {
+  const filteredStudents = students.filter((s) => {
     // Status check
-    const statusMatch = activeSubTab === "pending"
-      ? s.status === "pending"
-      : (!s.status || s.status === "approved");
+    const statusMatch =
+      activeSubTab === "pending"
+        ? s.status === "pending"
+        : !s.status || s.status === "approved";
 
-    const nameMatch = `${s.first_name} ${s.surname}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      s.registration_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      s.program_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const progMatch = programFilter === "all" || s.program_name === programFilter;
+    const nameMatch =
+      `${s.first_name} ${s.surname}`
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      s.registration_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.program_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const progMatch =
+      programFilter === "all" || s.program_name === programFilter;
     const yearMatch = yearFilter === "all" || s.academic_year === yearFilter;
-    const gendMatch = genderFilter === "all" || s.gender.toUpperCase() === genderFilter.toUpperCase();
+    const gendMatch =
+      genderFilter === "all" ||
+      s.gender.toUpperCase() === genderFilter.toUpperCase();
 
     return statusMatch && nameMatch && progMatch && yearMatch && gendMatch;
   });
 
   // Calculate stats
   const totalCount = students.length;
-  const femaleCount = students.filter(s => s.gender.toUpperCase() === "F" || s.gender.toUpperCase() === "FEMALE").length;
+  const femaleCount = students.filter(
+    (s) =>
+      s.gender.toUpperCase() === "F" || s.gender.toUpperCase() === "FEMALE",
+  ).length;
   const maleCount = totalCount - femaleCount;
 
   // Pagination calculation
   const indexOfLastRow = currentPage * rowsPerPage;
   const indexOfFirstRow = indexOfLastRow - rowsPerPage;
   const currentRows = filteredStudents.slice(indexOfFirstRow, indexOfLastRow);
-  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / rowsPerPage));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredStudents.length / rowsPerPage),
+  );
 
   return (
     <div className="space-y-6" id="admin_students_module">
-      
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -323,13 +385,18 @@ export default function StudentsManager({
             <span>Students Register</span>
           </h2>
           <p className="text-xs text-zinc-500 font-sans">
-            Verify academic programs, cumulative records, and manage voter eligibility registers
+            Verify academic programs, cumulative records, and manage voter
+            eligibility registers
           </p>
         </div>
 
         <div className="flex gap-2">
           <button
-            onClick={() => { setIsUploadingCSV(true); setIsAddingSingle(false); setPreviewRows([]); }}
+            onClick={() => {
+              setIsUploadingCSV(true);
+              setIsAddingSingle(false);
+              setPreviewRows([]);
+            }}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-500/10 transition-all active:scale-95"
             id="btn_bulk_upload_students"
           >
@@ -338,7 +405,10 @@ export default function StudentsManager({
           </button>
 
           <button
-            onClick={() => { setIsAddingSingle(true); setIsUploadingCSV(false); }}
+            onClick={() => {
+              setIsAddingSingle(true);
+              setIsUploadingCSV(false);
+            }}
             className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all active:scale-95"
             id="btn_add_single_student"
           >
@@ -349,32 +419,53 @@ export default function StudentsManager({
       </div>
 
       {/* METRIC CARD BAR */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4" id="students_analytics_dashboard">
+      <div
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+        id="students_analytics_dashboard"
+      >
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
-          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider font-mono">Total Verified Register</span>
+          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider font-mono">
+            Total Verified Register
+          </span>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">{totalCount}</span>
-            <span className="text-xs text-emerald-500 font-semibold font-mono">Students</span>
+            <span className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+              {totalCount}
+            </span>
+            <span className="text-xs text-emerald-500 font-semibold font-mono">
+              Students
+            </span>
           </div>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
-          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider font-mono">Gender Proportion</span>
+          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider font-mono">
+            Gender Proportion
+          </span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-xl font-bold text-zinc-800 dark:text-zinc-100">
               {maleCount} M / {femaleCount} F
             </span>
             <span className="text-xs text-zinc-500 font-mono">
-              ({totalCount > 0 ? Math.round((femaleCount / totalCount) * 100) : 0}% Female)
+              (
+              {totalCount > 0
+                ? Math.round((femaleCount / totalCount) * 100)
+                : 0}
+              % Female)
             </span>
           </div>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
-          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider font-mono">Unique Programs</span>
+          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider font-mono">
+            Unique Programs
+          </span>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">{uniquePrograms.length}</span>
-            <span className="text-xs text-zinc-400 font-mono">Faculties/Courses</span>
+            <span className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+              {uniquePrograms.length}
+            </span>
+            <span className="text-xs text-zinc-400 font-mono">
+              Faculties/Courses
+            </span>
           </div>
         </div>
       </div>
@@ -385,40 +476,45 @@ export default function StudentsManager({
           <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
             <div className="flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
-              <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">Bulk Students CSV Upload Engine</h3>
+              <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
+                Bulk Students CSV Upload Engine
+              </h3>
             </div>
-            <button 
-              onClick={() => { setIsUploadingCSV(false); setPreviewRows([]); }}
+            <button
+              onClick={() => {
+                setIsUploadingCSV(false);
+                setPreviewRows([]);
+              }}
               className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div 
-            onDragEnter={handleDrag} 
-            onDragLeave={handleDrag} 
-            onDragOver={handleDrag} 
+          <div
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
             onDrop={handleDrop}
             className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${
-              dragActive 
-                ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10" 
+              dragActive
+                ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10"
                 : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
             }`}
           >
-            <input 
+            <input
               ref={fileInputRef}
-              type="file" 
+              type="file"
               accept=".csv"
               onChange={handleFileChange}
-              className="hidden" 
+              className="hidden"
             />
-            
+
             <Upload className="w-8 h-8 text-zinc-400 mx-auto mb-2" />
             <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
               Drag and drop your students.csv file here, or{" "}
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="text-emerald-600 hover:text-emerald-700 font-bold underline cursor-pointer bg-transparent"
               >
@@ -426,17 +522,23 @@ export default function StudentsManager({
               </button>
             </p>
             <p className="text-[10px] text-zinc-400 mt-1 font-mono">
-              Columns auto-detected: program_name, academic_year, registration_number, cum_number, surname, first_name, gender
+              Columns auto-detected: program_name, academic_year,
+              registration_number, cum_number, surname, first_name, gender
             </p>
           </div>
 
           {/* Quick paste text area alternative */}
           <div className="space-y-2">
-            <label className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">Or Paste Comma-Separated CSV Raw Rows</label>
+            <label className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">
+              Or Paste Comma-Separated CSV Raw Rows
+            </label>
             <textarea
               rows={3}
               value={csvText}
-              onChange={(e) => { setCsvText(e.target.value); processCSVFile(e.target.value); }}
+              onChange={(e) => {
+                setCsvText(e.target.value);
+                processCSVFile(e.target.value);
+              }}
               placeholder="program_name,academic_year,registration_number,cum_number,surname,first_name,gender&#10;BSc Computer Science,2026/2027,REG001,3.8,Kandodo,Desire,M"
               className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-mono focus:outline-none focus:border-emerald-500 text-zinc-800 dark:text-zinc-200"
             />
@@ -444,12 +546,18 @@ export default function StudentsManager({
 
           {/* Import Logs */}
           {importLogs && (
-            <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
-              importLogs.error 
-                ? "bg-red-50 text-red-800 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30" 
-                : "bg-emerald-50 text-emerald-800 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30"
-            }`}>
-              {importLogs.error ? <AlertCircle className="w-4 h-4 flex-shrink-0" /> : <CheckCircle2 className="w-4 h-4 flex-shrink-0" />}
+            <div
+              className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+                importLogs.error
+                  ? "bg-red-50 text-red-800 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30"
+                  : "bg-emerald-50 text-emerald-800 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30"
+              }`}
+            >
+              {importLogs.error ? (
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              )}
               <span>{importLogs.error || importLogs.success}</span>
             </div>
           )}
@@ -459,7 +567,10 @@ export default function StudentsManager({
             <div className="space-y-2 pt-2">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                  Ready to Import: <span className="text-emerald-600">{previewRows.length} Rows Parsed</span>
+                  Ready to Import:{" "}
+                  <span className="text-emerald-600">
+                    {previewRows.length} Rows Parsed
+                  </span>
                 </span>
                 <button
                   onClick={handleImportConfirm}
@@ -483,10 +594,19 @@ export default function StudentsManager({
                   </thead>
                   <tbody>
                     {previewRows.slice(0, 10).map((row, idx) => (
-                      <tr key={idx} className="border-b border-zinc-100 dark:border-zinc-800/50 text-zinc-700 dark:text-zinc-300">
-                        <td className="px-3 py-1.5 font-medium">{row.first_name}</td>
-                        <td className="px-3 py-1.5 font-medium">{row.surname}</td>
-                        <td className="px-3 py-1.5 font-mono text-zinc-500">{row.registration_number}</td>
+                      <tr
+                        key={idx}
+                        className="border-b border-zinc-100 dark:border-zinc-800/50 text-zinc-700 dark:text-zinc-300"
+                      >
+                        <td className="px-3 py-1.5 font-medium">
+                          {row.first_name}
+                        </td>
+                        <td className="px-3 py-1.5 font-medium">
+                          {row.surname}
+                        </td>
+                        <td className="px-3 py-1.5 font-mono text-zinc-500">
+                          {row.registration_number}
+                        </td>
                         <td className="px-3 py-1.5">{row.program_name}</td>
                         <td className="px-3 py-1.5">{row.academic_year}</td>
                         <td className="px-3 py-1.5 font-mono">{row.gender}</td>
@@ -496,7 +616,8 @@ export default function StudentsManager({
                 </table>
                 {previewRows.length > 10 && (
                   <p className="text-[10px] text-zinc-400 text-center py-1.5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 font-mono">
-                    Showing first 10 preview rows of {previewRows.length} parsed records.
+                    Showing first 10 preview rows of {previewRows.length} parsed
+                    records.
                   </p>
                 )}
               </div>
@@ -507,10 +628,15 @@ export default function StudentsManager({
 
       {/* ACTIVE MODAL: ADD SINGLE STUDENT FORM */}
       {isAddingSingle && (
-        <form onSubmit={handleSingleSubmit} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-md space-y-4">
+        <form
+          onSubmit={handleSingleSubmit}
+          className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-md space-y-4"
+        >
           <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
-            <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">Add Student to Database Register</h3>
-            <button 
+            <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
+              Add Student to Database Register
+            </h3>
+            <button
               type="button"
               onClick={() => setIsAddingSingle(false)}
               className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -522,8 +648,8 @@ export default function StudentsManager({
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
             <div className="space-y-1">
               <label className="font-semibold text-zinc-500">First Name</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="e.g. Desire"
@@ -534,8 +660,8 @@ export default function StudentsManager({
 
             <div className="space-y-1">
               <label className="font-semibold text-zinc-500">Surname</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={surname}
                 onChange={(e) => setSurname(e.target.value)}
                 placeholder="e.g. Kandodo"
@@ -545,9 +671,11 @@ export default function StudentsManager({
             </div>
 
             <div className="space-y-1">
-              <label className="font-semibold text-zinc-500">Registration Number</label>
-              <input 
-                type="text" 
+              <label className="font-semibold text-zinc-500">
+                Registration Number
+              </label>
+              <input
+                type="text"
                 value={registrationNumber}
                 onChange={(e) => setRegistrationNumber(e.target.value)}
                 placeholder="e.g. REG/CS/2026/011"
@@ -557,9 +685,11 @@ export default function StudentsManager({
             </div>
 
             <div className="space-y-1">
-              <label className="font-semibold text-zinc-500">Program Name</label>
-              <input 
-                type="text" 
+              <label className="font-semibold text-zinc-500">
+                Program Name
+              </label>
+              <input
+                type="text"
                 value={programName}
                 onChange={(e) => setProgramName(e.target.value)}
                 placeholder="e.g. BSc Computer Science"
@@ -569,9 +699,11 @@ export default function StudentsManager({
             </div>
 
             <div className="space-y-1">
-              <label className="font-semibold text-zinc-500">Academic Year</label>
-              <input 
-                type="text" 
+              <label className="font-semibold text-zinc-500">
+                Academic Year
+              </label>
+              <input
+                type="text"
                 value={academicYear}
                 onChange={(e) => setAcademicYear(e.target.value)}
                 placeholder="e.g. 2026/2027"
@@ -582,8 +714,8 @@ export default function StudentsManager({
 
             <div className="space-y-1">
               <label className="font-semibold text-zinc-500">CUM Number</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={cumNumber}
                 onChange={(e) => setCumNumber(e.target.value)}
                 placeholder="e.g. 3.75 or 76.5"
@@ -619,19 +751,27 @@ export default function StudentsManager({
 
       {/* ACTIVE MODAL: MANUAL STUDENT LINKING FORM */}
       {linkingStudentId && (
-        <form onSubmit={handleManualLinkEmail} className="bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-6 shadow-md space-y-4">
+        <form
+          onSubmit={handleManualLinkEmail}
+          className="bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-6 shadow-md space-y-4"
+        >
           <div className="flex items-center justify-between pb-3 border-b border-amber-100 dark:border-amber-900/20">
             <div className="flex items-center gap-2">
               <Link className="w-5 h-5 text-amber-500" />
               <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
-                Connect Google Email Manually for: <span className="text-amber-700 dark:text-amber-400 font-bold">
-                  {students.find(s => s.id === linkingStudentId)?.first_name} {students.find(s => s.id === linkingStudentId)?.surname}
+                Connect Google Email Manually for:{" "}
+                <span className="text-amber-700 dark:text-amber-400 font-bold">
+                  {students.find((s) => s.id === linkingStudentId)?.first_name}{" "}
+                  {students.find((s) => s.id === linkingStudentId)?.surname}
                 </span>
               </h3>
             </div>
-            <button 
+            <button
               type="button"
-              onClick={() => { setLinkingStudentId(null); setManualEmailInput(""); }}
+              onClick={() => {
+                setLinkingStudentId(null);
+                setManualEmailInput("");
+              }}
               className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             >
               <X className="w-4 h-4" />
@@ -639,10 +779,12 @@ export default function StudentsManager({
           </div>
 
           <div className="space-y-2 max-w-md">
-            <label className="text-xs font-semibold text-zinc-500">Google Auth Email Address</label>
+            <label className="text-xs font-semibold text-zinc-500">
+              Google Auth Email Address
+            </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-zinc-400 absolute left-3 top-3.5" />
-              <input 
+              <input
                 type="email"
                 value={manualEmailInput}
                 onChange={(e) => setManualEmailInput(e.target.value)}
@@ -652,14 +794,18 @@ export default function StudentsManager({
               />
             </div>
             <p className="text-[10px] text-zinc-400">
-              Only official @cunima.ac.mw Google emails are permitted for validation mapping.
+              Only official @cunima.ac.mw Google emails are permitted for
+              validation mapping.
             </p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-amber-100 dark:border-amber-900/20">
             <button
               type="button"
-              onClick={() => { setLinkingStudentId(null); setManualEmailInput(""); }}
+              onClick={() => {
+                setLinkingStudentId(null);
+                setManualEmailInput("");
+              }}
               className="px-4 py-2 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 text-zinc-500 text-xs font-semibold rounded-full transition-colors"
             >
               Cancel
@@ -676,14 +822,16 @@ export default function StudentsManager({
 
       {/* FILTER CONTROLS BAR */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
-        
         {/* Search */}
         <div className="relative w-full md:max-w-xs">
           <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-          <input 
+          <input
             type="text"
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Search name, ID or program..."
             className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:outline-none focus:border-emerald-500"
           />
@@ -696,12 +844,17 @@ export default function StudentsManager({
             <span className="text-[10px] text-zinc-400 font-mono">Prog:</span>
             <select
               value={programFilter}
-              onChange={(e) => { setProgramFilter(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => {
+                setProgramFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-[11px] font-semibold focus:outline-none"
             >
               <option value="all">All Programs</option>
-              {uniquePrograms.map(p => (
-                <option key={p} value={p}>{p}</option>
+              {uniquePrograms.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
               ))}
             </select>
           </div>
@@ -711,12 +864,17 @@ export default function StudentsManager({
             <span className="text-[10px] text-zinc-400 font-mono">Year:</span>
             <select
               value={yearFilter}
-              onChange={(e) => { setYearFilter(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => {
+                setYearFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-[11px] font-semibold focus:outline-none"
             >
               <option value="all">All Years</option>
-              {uniqueYears.map(y => (
-                <option key={y} value={y}>{y}</option>
+              {uniqueYears.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
               ))}
             </select>
           </div>
@@ -726,7 +884,10 @@ export default function StudentsManager({
             <span className="text-[10px] text-zinc-400 font-mono">Gender:</span>
             <select
               value={genderFilter}
-              onChange={(e) => { setGenderFilter(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => {
+                setGenderFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-[11px] font-semibold focus:outline-none"
             >
               <option value="all">All Genders</option>
@@ -735,23 +896,29 @@ export default function StudentsManager({
             </select>
           </div>
         </div>
-
       </div>
 
       {/* SUB-TABS SELECTOR */}
       <div className="flex border-b border-zinc-200 dark:border-zinc-800 my-2">
         <button
-          onClick={() => { setActiveSubTab("verified"); setCurrentPage(1); }}
+          onClick={() => {
+            setActiveSubTab("verified");
+            setCurrentPage(1);
+          }}
           className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
             activeSubTab === "verified"
               ? "border-emerald-600 text-emerald-700 dark:text-emerald-400 font-bold"
               : "border-transparent text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
           }`}
         >
-          Verified Student Directory ({students.filter(s => !s.status || s.status === "approved").length})
+          Verified Student Directory (
+          {students.filter((s) => !s.status || s.status === "approved").length})
         </button>
         <button
-          onClick={() => { setActiveSubTab("pending"); setCurrentPage(1); }}
+          onClick={() => {
+            setActiveSubTab("pending");
+            setCurrentPage(1);
+          }}
           className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
             activeSubTab === "pending"
               ? "border-amber-500 text-amber-600 dark:text-amber-400 font-bold"
@@ -760,13 +927,16 @@ export default function StudentsManager({
         >
           <span>Pending Applications</span>
           <span className="bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 font-bold text-[10px] px-2 py-0.5 rounded-full font-mono">
-            {students.filter(s => s.status === "pending").length}
+            {students.filter((s) => s.status === "pending").length}
           </span>
         </button>
       </div>
 
       {/* REGISTERED STUDENTS TABLE LIST */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden" id="students_register_datatable">
+      <div
+        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden"
+        id="students_register_datatable"
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
@@ -790,7 +960,7 @@ export default function StudentsManager({
                 </tr>
               ) : (
                 currentRows.map((student) => (
-                  <tr 
+                  <tr
                     key={student.id}
                     className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 text-zinc-800 dark:text-zinc-200 transition-colors"
                   >
@@ -807,7 +977,9 @@ export default function StudentsManager({
                           <span>{student.email}</span>
                         </div>
                       ) : (
-                        <span className="text-[10px] text-zinc-400 italic">Not Connected</span>
+                        <span className="text-[10px] text-zinc-400 italic">
+                          Not Connected
+                        </span>
                       )}
                     </td>
 
@@ -837,7 +1009,10 @@ export default function StudentsManager({
 
                     <td className="px-5 py-3.5 text-right flex justify-end gap-1">
                       <button
-                        onClick={() => { setLinkingStudentId(student.id); setManualEmailInput(student.email || ""); }}
+                        onClick={() => {
+                          setLinkingStudentId(student.id);
+                          setManualEmailInput(student.email || "");
+                        }}
                         className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20 rounded-lg transition-colors cursor-pointer"
                         title="Manually connect/edit Google email"
                       >
@@ -845,7 +1020,12 @@ export default function StudentsManager({
                       </button>
                       {student.status === "pending" && (
                         <button
-                          onClick={() => handleApproveStudent(student.id, `${student.first_name} ${student.surname}`)}
+                          onClick={() =>
+                            handleApproveStudent(
+                              student.id,
+                              `${student.first_name} ${student.surname}`,
+                            )
+                          }
                           className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-lg transition-colors cursor-pointer"
                           title="Approve and Verify student"
                         >
@@ -853,7 +1033,12 @@ export default function StudentsManager({
                         </button>
                       )}
                       <button
-                        onClick={() => handleDeleteStudent(student.id, `${student.first_name} ${student.surname}`)}
+                        onClick={() =>
+                          handleDeleteStudent(
+                            student.id,
+                            `${student.first_name} ${student.surname}`,
+                          )
+                        }
                         className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
                         title="Delete Student record"
                       >
@@ -871,13 +1056,15 @@ export default function StudentsManager({
         {filteredStudents.length > 0 && (
           <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs font-mono text-zinc-500">
             <span>
-              Showing {indexOfFirstRow + 1} - {Math.min(indexOfLastRow, filteredStudents.length)} of {filteredStudents.length} entries
+              Showing {indexOfFirstRow + 1} -{" "}
+              {Math.min(indexOfLastRow, filteredStudents.length)} of{" "}
+              {filteredStudents.length} entries
             </span>
 
             <div className="flex items-center gap-2">
               <button
                 disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                 className="p-1 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-45 cursor-pointer transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -889,7 +1076,9 @@ export default function StudentsManager({
 
               <button
                 disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
                 className="p-1 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-45 cursor-pointer transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -898,7 +1087,6 @@ export default function StudentsManager({
           </div>
         )}
       </div>
-
     </div>
   );
 }

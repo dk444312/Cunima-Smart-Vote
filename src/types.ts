@@ -7,8 +7,8 @@ export interface ElectionRow {
   id: string;
   title: string;
   description: string;
-  status: 'draft' | 'active' | 'completed';
-  candidates: string[]; // JSON representation or parsed array of string candidates
+  status: "draft" | "active" | "completed";
+  candidates: any[]; // JSON representation or parsed array of string candidates or objects {name, photo_url}
   created_at: string;
   published: boolean;
   published_at?: string;
@@ -21,7 +21,7 @@ export interface VoterRow {
   password?: string;
   created_at: string;
   is_blocked?: boolean;
-  role?: 'voter' | 'club_manager' | 'admin'; // can be regular voter, club_manager, or admin
+  role?: "voter" | "club_manager" | "admin"; // can be regular voter, club_manager, or admin
   guard_locked?: boolean;
 }
 
@@ -50,7 +50,7 @@ export interface ClubMemberRow {
 export interface LoggedInUser {
   id: string;
   username: string;
-  role: 'admin' | 'voter' | 'club_manager';
+  role: "admin" | "voter" | "club_manager";
   is_blocked?: boolean;
   guard_locked?: boolean;
 }
@@ -60,6 +60,7 @@ export interface UpdateRow {
   author: string;
   content: string;
   created_at: string;
+  media_url?: string;
 }
 
 export interface UpdateLikeRow {
@@ -89,5 +90,5 @@ export interface StudentRow {
   gender: string;
   uploaded_at: string;
   email?: string;
-  status?: 'pending' | 'approved';
+  status?: "pending" | "approved";
 }

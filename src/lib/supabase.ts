@@ -4,15 +4,29 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { ElectionRow, VoterRow, VoteRow, UpdateRow, UpdateLikeRow, UpdateCommentRow, ClubRow, ClubMemberRow, StudentRow } from "../types.ts";
+import {
+  ElectionRow,
+  VoterRow,
+  VoteRow,
+  UpdateRow,
+  UpdateLikeRow,
+  UpdateCommentRow,
+  ClubRow,
+  ClubMemberRow,
+  StudentRow,
+} from "../types.ts";
 
 const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
 const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
 
-export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== "YOUR_SUPABASE_PROJECT_URL");
+export const isSupabaseConfigured = !!(
+  supabaseUrl &&
+  supabaseAnonKey &&
+  supabaseUrl !== "YOUR_SUPABASE_PROJECT_URL"
+);
 
-export const supabase = isSupabaseConfigured 
-  ? createClient(supabaseUrl, supabaseAnonKey) 
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
 // LocalStorage Keys for simulation fallback
@@ -41,7 +55,7 @@ function getCachedData<T>(key: string): T | null {
 function setCachedData<T>(key: string, data: T): void {
   dbCache[key] = {
     data,
-    expiry: Date.now() + CACHE_TTL_MS
+    expiry: Date.now() + CACHE_TTL_MS,
   };
 }
 
@@ -63,9 +77,24 @@ function saveLocalTable<T>(key: string, data: T[]): void {
 }
 
 // Premade users for fallback / initialization
-export const PREMADE_ADMIN = { id: "admin-id", username: "admin", password: "admin", role: "admin" };
-export const PREMADE_VOTER = { id: "voter-id", username: "voter", password: "voter", role: "voter" };
-export const PREMADE_MANAGER = { id: "manager-id", username: "manager", password: "manager", role: "club_manager" };
+export const PREMADE_ADMIN = {
+  id: "admin-id",
+  username: "admin",
+  password: "admin",
+  role: "admin",
+};
+export const PREMADE_VOTER = {
+  id: "voter-id",
+  username: "voter",
+  password: "voter",
+  role: "voter",
+};
+export const PREMADE_MANAGER = {
+  id: "manager-id",
+  username: "manager",
+  password: "manager",
+  role: "club_manager",
+};
 
 // Safe initialization function
 export async function initializeDatabase() {
@@ -83,7 +112,7 @@ export async function initializeDatabase() {
           id: PREMADE_VOTER.id,
           username: PREMADE_VOTER.username,
           password: PREMADE_VOTER.password,
-          created_at: new Date().toLocaleDateString()
+          created_at: new Date().toLocaleDateString(),
         });
       }
 
@@ -100,7 +129,7 @@ export async function initializeDatabase() {
           username: PREMADE_MANAGER.username,
           password: PREMADE_MANAGER.password,
           role: "club_manager",
-          created_at: new Date().toLocaleDateString()
+          created_at: new Date().toLocaleDateString(),
         });
       }
 
@@ -115,44 +144,51 @@ export async function initializeDatabase() {
         await supabase.from("clubs").insert({
           id: sampleClubId,
           name: "General Debate Club",
-          description: "An elite debating club for active election mock trials.",
+          description:
+            "An elite debating club for active election mock trials.",
           manager_id: PREMADE_MANAGER.id,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
         });
 
         // Also add the voter as a member of this club
         await supabase.from("club_members").insert({
           id: "cm-sample-1",
           club_id: sampleClubId,
-          voter_id: PREMADE_VOTER.id
+          voter_id: PREMADE_VOTER.id,
         });
       }
-
     } catch (err) {
-      console.warn("Could not check/insert premade profiles in Supabase. Check if tables exist.", err);
+      console.warn(
+        "Could not check/insert premade profiles in Supabase. Check if tables exist.",
+        err,
+      );
     }
   } else {
     // Local fallback database seeding
     const voters = getLocalTable<VoterRow>(VOTERS_KEY);
-    const hasPremadeVoter = voters.some(v => v.username === PREMADE_VOTER.username);
+    const hasPremadeVoter = voters.some(
+      (v) => v.username === PREMADE_VOTER.username,
+    );
     if (!hasPremadeVoter) {
       voters.push({
         id: PREMADE_VOTER.id,
         username: PREMADE_VOTER.username,
         password: PREMADE_VOTER.password,
         role: "voter",
-        created_at: new Date().toLocaleDateString()
+        created_at: new Date().toLocaleDateString(),
       });
     }
 
-    const hasPremadeManager = voters.some(v => v.username === PREMADE_MANAGER.username);
+    const hasPremadeManager = voters.some(
+      (v) => v.username === PREMADE_MANAGER.username,
+    );
     if (!hasPremadeManager) {
       voters.push({
         id: PREMADE_MANAGER.id,
         username: PREMADE_MANAGER.username,
         password: PREMADE_MANAGER.password,
         role: "club_manager",
-        created_at: new Date().toLocaleDateString()
+        created_at: new Date().toLocaleDateString(),
       });
     }
     saveLocalTable(VOTERS_KEY, voters);
@@ -165,7 +201,7 @@ export async function initializeDatabase() {
         name: "General Debate Club",
         description: "An elite debating club for active election mock trials.",
         manager_id: PREMADE_MANAGER.id,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       });
       saveLocalTable(CLUBS_KEY, clubsList);
 
@@ -174,7 +210,7 @@ export async function initializeDatabase() {
         clubMembersList.push({
           id: "cm-sample-1",
           club_id: sampleClubId,
-          voter_id: PREMADE_VOTER.id
+          voter_id: PREMADE_VOTER.id,
         });
         saveLocalTable(CLUB_MEMBERS_KEY, clubMembersList);
       }
@@ -203,7 +239,13 @@ export const dbService = {
     return local;
   },
 
-  async insertElection(title: string, description: string, candidates: string[], clubId?: string | null, status: "draft" | "active" | "completed" = "draft"): Promise<ElectionRow> {
+  async insertElection(
+    title: string,
+    description: string,
+    candidates: any[],
+    clubId?: string | null,
+    status: "draft" | "active" | "completed" = "draft",
+  ): Promise<ElectionRow> {
     invalidateDBCache();
     const id = "elec_" + Math.floor(Math.random() * 1000000).toString();
     const newElection: ElectionRow = {
@@ -214,7 +256,7 @@ export const dbService = {
       candidates,
       created_at: new Date().toISOString(),
       published: false,
-      club_id: clubId || null
+      club_id: clubId || null,
     };
 
     if (isSupabaseConfigured && supabase) {
@@ -233,7 +275,10 @@ export const dbService = {
     return newElection;
   },
 
-  async updateElection(id: string, updates: Partial<ElectionRow>): Promise<void> {
+  async updateElection(
+    id: string,
+    updates: Partial<ElectionRow>,
+  ): Promise<void> {
     invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
@@ -245,28 +290,27 @@ export const dbService = {
     }
 
     const elections = getLocalTable<ElectionRow>(ELECTIONS_KEY);
-    const updated = elections.map(el => el.id === id ? { ...el, ...updates } : el);
+    const updated = elections.map((el) =>
+      el.id === id ? { ...el, ...updates } : el,
+    );
     saveLocalTable(ELECTIONS_KEY, updated);
   },
 
   async deleteElection(id: string): Promise<void> {
     invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase
-        .from("elections")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("elections").delete().eq("id", id);
       if (error) throw error;
       return;
     }
 
     let elections = getLocalTable<ElectionRow>(ELECTIONS_KEY);
-    elections = elections.filter(el => el.id !== id);
+    elections = elections.filter((el) => el.id !== id);
     saveLocalTable(ELECTIONS_KEY, elections);
 
     // Cascading delete votes
     let votes = getLocalTable<VoteRow>(VOTES_KEY);
-    votes = votes.filter(v => v.election_id !== id);
+    votes = votes.filter((v) => v.election_id !== id);
     saveLocalTable(VOTES_KEY, votes);
   },
 
@@ -289,7 +333,11 @@ export const dbService = {
     return local;
   },
 
-  async insertVoter(username: string, password?: string, role: 'voter' | 'club_manager' | 'admin' = 'voter'): Promise<VoterRow> {
+  async insertVoter(
+    username: string,
+    password?: string,
+    role: "voter" | "club_manager" | "admin" = "voter",
+  ): Promise<VoterRow> {
     invalidateDBCache();
     const id = "voter_" + Math.floor(Math.random() * 1000000).toString();
     const newVoter: VoterRow = {
@@ -298,7 +346,7 @@ export const dbService = {
       password: password || "voter",
       created_at: new Date().toLocaleDateString(),
       is_blocked: false,
-      role
+      role,
     };
 
     if (isSupabaseConfigured && supabase) {
@@ -309,7 +357,9 @@ export const dbService = {
         .single();
       if (error) {
         if (error.code === "23505") {
-          throw new Error(`UNIQUE constraint violation: Voter with username "${username}" already exists.`);
+          throw new Error(
+            `UNIQUE constraint violation: Voter with username "${username}" already exists.`,
+          );
         }
         throw error;
       }
@@ -317,8 +367,14 @@ export const dbService = {
     }
 
     const voters = getLocalTable<VoterRow>(VOTERS_KEY);
-    if (voters.some(v => v.username.toLowerCase() === username.trim().toLowerCase())) {
-      throw new Error(`UNIQUE constraint violation: Voter with username "${username}" already exists.`);
+    if (
+      voters.some(
+        (v) => v.username.toLowerCase() === username.trim().toLowerCase(),
+      )
+    ) {
+      throw new Error(
+        `UNIQUE constraint violation: Voter with username "${username}" already exists.`,
+      );
     }
     voters.push(newVoter);
     saveLocalTable(VOTERS_KEY, voters);
@@ -343,33 +399,34 @@ export const dbService = {
 
     const voters = getLocalTable<VoterRow>(VOTERS_KEY);
     if (updates.username) {
-      const exists = voters.some(v => v.id !== id && v.username.toLowerCase() === updates.username!.toLowerCase());
+      const exists = voters.some(
+        (v) =>
+          v.id !== id &&
+          v.username.toLowerCase() === updates.username!.toLowerCase(),
+      );
       if (exists) {
         throw new Error(`Username already taken by another user.`);
       }
     }
-    const updated = voters.map(v => v.id === id ? { ...v, ...updates } : v);
+    const updated = voters.map((v) => (v.id === id ? { ...v, ...updates } : v));
     saveLocalTable(VOTERS_KEY, updated);
   },
 
   async deleteVoter(id: string): Promise<void> {
     invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase
-        .from("voters")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("voters").delete().eq("id", id);
       if (error) throw error;
       return;
     }
 
     let voters = getLocalTable<VoterRow>(VOTERS_KEY);
-    voters = voters.filter(v => v.id !== id);
+    voters = voters.filter((v) => v.id !== id);
     saveLocalTable(VOTERS_KEY, voters);
 
     // Cascading delete votes
     let votes = getLocalTable<VoteRow>(VOTES_KEY);
-    votes = votes.filter(v => v.voter_id !== id);
+    votes = votes.filter((v) => v.voter_id !== id);
     saveLocalTable(VOTES_KEY, votes);
   },
 
@@ -379,9 +436,7 @@ export const dbService = {
     if (cached) return cached;
 
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from("votes")
-        .select("*");
+      const { data, error } = await supabase.from("votes").select("*");
       if (error) throw error;
       setCachedData("votes", data || []);
       return data || [];
@@ -391,7 +446,11 @@ export const dbService = {
     return local;
   },
 
-  async insertVote(voterId: string, electionId: string, candidate: string): Promise<VoteRow> {
+  async insertVote(
+    voterId: string,
+    electionId: string,
+    candidate: string,
+  ): Promise<VoteRow> {
     invalidateDBCache();
     const id = "vote_" + Math.floor(Math.random() * 1000000).toString();
     const newVote: VoteRow = {
@@ -399,7 +458,7 @@ export const dbService = {
       voter_id: voterId,
       election_id: electionId,
       candidate,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
 
     if (isSupabaseConfigured && supabase) {
@@ -418,7 +477,9 @@ export const dbService = {
     }
 
     const votes = getLocalTable<VoteRow>(VOTES_KEY);
-    if (votes.some(v => v.voter_id === voterId && v.election_id === electionId)) {
+    if (
+      votes.some((v) => v.voter_id === voterId && v.election_id === electionId)
+    ) {
       throw new Error("You have already cast a vote in this election.");
     }
     votes.push(newVote);
@@ -440,19 +501,26 @@ export const dbService = {
       setCachedData("updates", data || []);
       return data || [];
     }
-    const local = getLocalTable<UpdateRow>(UPDATES_KEY).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const local = getLocalTable<UpdateRow>(UPDATES_KEY).sort((a, b) =>
+      b.created_at.localeCompare(a.created_at),
+    );
     setCachedData("updates", local);
     return local;
   },
 
-  async insertUpdate(content: string, author: string): Promise<UpdateRow> {
+  async insertUpdate(
+    content: string,
+    author: string,
+    media_url?: string,
+  ): Promise<UpdateRow> {
     invalidateDBCache();
     const id = "upd_" + Math.floor(Math.random() * 1000000).toString();
     const newUpdate: UpdateRow = {
       id,
       content: content.trim(),
       author: author.trim(),
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      ...(media_url ? { media_url } : {}),
     };
 
     if (isSupabaseConfigured && supabase) {
@@ -474,24 +542,21 @@ export const dbService = {
   async deleteUpdate(id: string): Promise<void> {
     invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase
-        .from("updates")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("updates").delete().eq("id", id);
       if (error) throw error;
       return;
     }
 
     let updates = getLocalTable<UpdateRow>(UPDATES_KEY);
-    updates = updates.filter(u => u.id !== id);
+    updates = updates.filter((u) => u.id !== id);
     saveLocalTable(UPDATES_KEY, updates);
 
     let likes = getLocalTable<UpdateLikeRow>(UPDATE_LIKES_KEY);
-    likes = likes.filter(l => l.update_id !== id);
+    likes = likes.filter((l) => l.update_id !== id);
     saveLocalTable(UPDATE_LIKES_KEY, likes);
 
     let comments = getLocalTable<UpdateCommentRow>(UPDATE_COMMENTS_KEY);
-    comments = comments.filter(c => c.update_id !== id);
+    comments = comments.filter((c) => c.update_id !== id);
     saveLocalTable(UPDATE_COMMENTS_KEY, comments);
   },
 
@@ -504,10 +569,16 @@ export const dbService = {
       if (error) throw error;
       return data || [];
     }
-    return getLocalTable<UpdateLikeRow>(UPDATE_LIKES_KEY).filter(l => l.update_id === updateId);
+    return getLocalTable<UpdateLikeRow>(UPDATE_LIKES_KEY).filter(
+      (l) => l.update_id === updateId,
+    );
   },
 
-  async toggleLikeUpdate(updateId: string, userId: string, username: string): Promise<boolean> {
+  async toggleLikeUpdate(
+    updateId: string,
+    userId: string,
+    username: string,
+  ): Promise<boolean> {
     if (isSupabaseConfigured && supabase) {
       const { data: existing, error: checkError } = await supabase
         .from("update_likes")
@@ -536,7 +607,9 @@ export const dbService = {
     }
 
     const likes = getLocalTable<UpdateLikeRow>(UPDATE_LIKES_KEY);
-    const index = likes.findIndex(l => l.update_id === updateId && l.user_id === userId);
+    const index = likes.findIndex(
+      (l) => l.update_id === updateId && l.user_id === userId,
+    );
     if (index > -1) {
       likes.splice(index, 1);
       saveLocalTable(UPDATE_LIKES_KEY, likes);
@@ -560,11 +633,16 @@ export const dbService = {
       return data || [];
     }
     return getLocalTable<UpdateCommentRow>(UPDATE_COMMENTS_KEY)
-      .filter(c => c.update_id === updateId)
+      .filter((c) => c.update_id === updateId)
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
   },
 
-  async insertUpdateComment(updateId: string, userId: string, username: string, content: string): Promise<UpdateCommentRow> {
+  async insertUpdateComment(
+    updateId: string,
+    userId: string,
+    username: string,
+    content: string,
+  ): Promise<UpdateCommentRow> {
     const id = "comm_" + Math.floor(Math.random() * 1000000).toString();
     const newComment: UpdateCommentRow = {
       id,
@@ -572,7 +650,7 @@ export const dbService = {
       user_id: userId,
       username,
       content: content.trim(),
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
 
     if (isSupabaseConfigured && supabase) {
@@ -610,7 +688,11 @@ export const dbService = {
     return local;
   },
 
-  async insertClub(name: string, description: string, managerId: string | null): Promise<ClubRow> {
+  async insertClub(
+    name: string,
+    description: string,
+    managerId: string | null,
+  ): Promise<ClubRow> {
     invalidateDBCache();
     const id = "club_" + Math.floor(Math.random() * 1000000).toString();
     const newClub: ClubRow = {
@@ -618,7 +700,7 @@ export const dbService = {
       name: name.trim(),
       description: description.trim(),
       manager_id: managerId,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
 
     if (isSupabaseConfigured && supabase) {
@@ -648,27 +730,24 @@ export const dbService = {
     }
 
     const clubs = getLocalTable<ClubRow>(CLUBS_KEY);
-    const updated = clubs.map(c => c.id === id ? { ...c, ...updates } : c);
+    const updated = clubs.map((c) => (c.id === id ? { ...c, ...updates } : c));
     saveLocalTable(CLUBS_KEY, updated);
   },
 
   async deleteClub(id: string): Promise<void> {
     invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase
-        .from("clubs")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("clubs").delete().eq("id", id);
       if (error) throw error;
       return;
     }
 
     let clubs = getLocalTable<ClubRow>(CLUBS_KEY);
-    clubs = clubs.filter(c => c.id !== id);
+    clubs = clubs.filter((c) => c.id !== id);
     saveLocalTable(CLUBS_KEY, clubs);
 
     let members = getLocalTable<ClubMemberRow>(CLUB_MEMBERS_KEY);
-    members = members.filter(m => m.club_id !== id);
+    members = members.filter((m) => m.club_id !== id);
     saveLocalTable(CLUB_MEMBERS_KEY, members);
   },
 
@@ -677,7 +756,7 @@ export const dbService = {
     const cached = getCachedData<ClubMemberRow[]>("club_members");
     if (cached) {
       if (clubId) {
-        return cached.filter(m => m.club_id === clubId);
+        return cached.filter((m) => m.club_id === clubId);
       }
       return cached;
     }
@@ -700,7 +779,7 @@ export const dbService = {
       setCachedData("club_members", all);
     }
     if (clubId) {
-      return all.filter(m => m.club_id === clubId);
+      return all.filter((m) => m.club_id === clubId);
     }
     return all;
   },
@@ -715,10 +794,10 @@ export const dbService = {
       if (delError) throw delError;
 
       if (voterIds.length > 0) {
-        const rowsToInsert = voterIds.map(vId => ({
+        const rowsToInsert = voterIds.map((vId) => ({
           id: `cm_${clubId}_${vId}`,
           club_id: clubId,
-          voter_id: vId
+          voter_id: vId,
         }));
         const { error: insError } = await supabase
           .from("club_members")
@@ -729,12 +808,12 @@ export const dbService = {
     }
 
     let allMembers = getLocalTable<ClubMemberRow>(CLUB_MEMBERS_KEY);
-    allMembers = allMembers.filter(m => m.club_id !== clubId);
-    voterIds.forEach(vId => {
+    allMembers = allMembers.filter((m) => m.club_id !== clubId);
+    voterIds.forEach((vId) => {
       allMembers.push({
         id: `cm_${clubId}_${vId}`,
         club_id: clubId,
-        voter_id: vId
+        voter_id: vId,
       });
     });
     saveLocalTable(CLUB_MEMBERS_KEY, allMembers);
@@ -759,13 +838,15 @@ export const dbService = {
     return local;
   },
 
-  async insertStudent(student: Omit<StudentRow, 'id' | 'uploaded_at'>): Promise<StudentRow> {
+  async insertStudent(
+    student: Omit<StudentRow, "id" | "uploaded_at">,
+  ): Promise<StudentRow> {
     invalidateDBCache();
     const id = "stud_" + Math.floor(Math.random() * 1000000).toString();
     const newStudent: StudentRow = {
       ...student,
       id,
-      uploaded_at: new Date().toISOString()
+      uploaded_at: new Date().toISOString(),
     };
 
     if (isSupabaseConfigured && supabase) {
@@ -781,7 +862,7 @@ export const dbService = {
           first_name: newStudent.first_name,
           gender: newStudent.gender,
           email: newStudent.email || null,
-          status: newStudent.status || 'approved'
+          status: newStudent.status || "approved",
         })
         .select()
         .single();
@@ -790,8 +871,16 @@ export const dbService = {
     }
 
     const local = getLocalTable<StudentRow>(STUDENTS_KEY);
-    if (local.some(s => s.registration_number.toLowerCase() === student.registration_number.toLowerCase())) {
-      throw new Error(`Student with registration number "${student.registration_number}" already exists.`);
+    if (
+      local.some(
+        (s) =>
+          s.registration_number.toLowerCase() ===
+          student.registration_number.toLowerCase(),
+      )
+    ) {
+      throw new Error(
+        `Student with registration number "${student.registration_number}" already exists.`,
+      );
     }
     local.push(newStudent);
     saveLocalTable(STUDENTS_KEY, local);
@@ -801,15 +890,15 @@ export const dbService = {
   async deleteStudent(id: string): Promise<void> {
     invalidateDBCache();
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase
-        .from("students")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("students").delete().eq("id", id);
       if (error) throw error;
       return;
     }
     const local = getLocalTable<StudentRow>(STUDENTS_KEY);
-    saveLocalTable(STUDENTS_KEY, local.filter(s => s.id !== id));
+    saveLocalTable(
+      STUDENTS_KEY,
+      local.filter((s) => s.id !== id),
+    );
   },
 
   async approveStudent(id: string): Promise<void> {
@@ -817,15 +906,15 @@ export const dbService = {
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("students")
-        .update({ status: 'approved' })
+        .update({ status: "approved" })
         .eq("id", id);
       if (error) throw error;
       return;
     }
     const local = getLocalTable<StudentRow>(STUDENTS_KEY);
-    const idx = local.findIndex(s => s.id === id);
+    const idx = local.findIndex((s) => s.id === id);
     if (idx >= 0) {
-      local[idx].status = 'approved';
+      local[idx].status = "approved";
       saveLocalTable(STUDENTS_KEY, local);
     }
   },
@@ -841,16 +930,18 @@ export const dbService = {
       return;
     }
     const local = getLocalTable<StudentRow>(STUDENTS_KEY);
-    const idx = local.findIndex(s => s.id === id);
+    const idx = local.findIndex((s) => s.id === id);
     if (idx >= 0) {
       local[idx].email = email;
       saveLocalTable(STUDENTS_KEY, local);
     }
   },
 
-  async importStudentsBulk(students: Omit<StudentRow, 'id' | 'uploaded_at'>[]): Promise<void> {
+  async importStudentsBulk(
+    students: Omit<StudentRow, "id" | "uploaded_at">[],
+  ): Promise<void> {
     if (isSupabaseConfigured && supabase) {
-      const insertPayload = students.map(s => ({
+      const insertPayload = students.map((s) => ({
         id: "stud_" + Math.floor(Math.random() * 10000000).toString(),
         program_name: s.program_name,
         academic_year: s.academic_year,
@@ -860,8 +951,8 @@ export const dbService = {
         first_name: s.first_name,
         gender: s.gender,
         email: s.email || null,
-        status: s.status || 'approved',
-        uploaded_at: new Date().toISOString()
+        status: s.status || "approved",
+        uploaded_at: new Date().toISOString(),
       }));
 
       const { error } = await supabase
@@ -872,14 +963,21 @@ export const dbService = {
     }
 
     const local = getLocalTable<StudentRow>(STUDENTS_KEY);
-    students.forEach(s => {
-      const idx = local.findIndex(x => x.registration_number.toLowerCase() === s.registration_number.toLowerCase());
+    students.forEach((s) => {
+      const idx = local.findIndex(
+        (x) =>
+          x.registration_number.toLowerCase() ===
+          s.registration_number.toLowerCase(),
+      );
       const row: StudentRow = {
         ...s,
-        id: idx >= 0 ? local[idx].id : "stud_" + Math.floor(Math.random() * 1000000).toString(),
+        id:
+          idx >= 0
+            ? local[idx].id
+            : "stud_" + Math.floor(Math.random() * 1000000).toString(),
         uploaded_at: new Date().toISOString(),
         email: s.email,
-        status: s.status || 'approved'
+        status: s.status || "approved",
       };
       if (idx >= 0) {
         local[idx] = row;
@@ -914,7 +1012,7 @@ export const dbService = {
     localStorage.removeItem(CLUBS_KEY);
     localStorage.removeItem(CLUB_MEMBERS_KEY);
     localStorage.removeItem(STUDENTS_KEY);
-  }
+  },
 };
 
 // SQL SQL DDL text for copying
@@ -951,7 +1049,7 @@ CREATE TABLE IF NOT EXISTS elections (
   title TEXT NOT NULL,
   description TEXT,
   status TEXT DEFAULT 'draft',
-  candidates TEXT[] DEFAULT '{}',
+  candidates JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now(),
   published BOOLEAN DEFAULT false,
   published_at TEXT,
@@ -973,7 +1071,8 @@ CREATE TABLE IF NOT EXISTS updates (
   id TEXT PRIMARY KEY,
   author TEXT NOT NULL,
   content TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  media_url TEXT
 );
 
 -- 7. CREATE UPDATE LIKES TABLE
