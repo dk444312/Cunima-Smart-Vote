@@ -91,7 +91,7 @@ export default function App() {
     Record<string, UpdateCommentRow[]>
   >({});
   const [students, setStudents] = useState<StudentRow[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Student Registration Form States (Google or Username/Password Auth)
   const [pendingGoogleUser, setPendingGoogleUser] = useState<{
@@ -1474,57 +1474,57 @@ export default function App() {
                 </div>
 
                 <div className="space-y-4 font-sans text-xs">
-                  <div className="grid grid-cols-2 gap-3.5">
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="space-y-1 bg-zinc-50 dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
                         First Name
                       </span>
-                      <p className="font-semibold text-zinc-900 dark:text-zinc-50 text-sm">
+                      <p className="font-bold text-zinc-900 dark:text-zinc-50 text-sm">
                         {pendingIdentityConfirm.student.first_name}
                       </p>
                     </div>
 
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
+                    <div className="space-y-1 bg-zinc-50 dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
                         Surname
                       </span>
-                      <p className="font-semibold text-zinc-900 dark:text-zinc-50 text-sm">
+                      <p className="font-bold text-zinc-900 dark:text-zinc-50 text-sm">
                         {pendingIdentityConfirm.student.surname}
                       </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3.5">
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="space-y-1 bg-zinc-50 dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
                         Registration Number
                       </span>
-                      <p className="font-semibold text-zinc-900 dark:text-zinc-50 font-mono text-[13px]">
+                      <p className="font-bold text-zinc-900 dark:text-zinc-50 font-mono text-[13px]">
                         {pendingIdentityConfirm.student.registration_number}
                       </p>
                     </div>
 
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
+                    <div className="space-y-1 bg-zinc-50 dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
                         Academic Year
                       </span>
-                      <p className="font-semibold text-zinc-900 dark:text-zinc-50 font-mono">
+                      <p className="font-bold text-zinc-900 dark:text-zinc-50 font-mono">
                         {pendingIdentityConfirm.student.academic_year}
                       </p>
                     </div>
                   </div>
 
-                  <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
+                  <div className="space-y-1 bg-zinc-50 dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-100 dark:border-zinc-900/50">
                     <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
                       Registered Program Course
                     </span>
-                    <p className="font-semibold text-zinc-900 dark:text-zinc-50">
+                    <p className="font-bold text-zinc-900 dark:text-zinc-50">
                       {pendingIdentityConfirm.student.program_name}
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3.5">
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="space-y-1 bg-zinc-50 dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
                         CUM Number
                       </span>
@@ -1533,11 +1533,11 @@ export default function App() {
                       </p>
                     </div>
 
-                    <div className="space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-full border border-zinc-100 dark:border-zinc-900/50">
+                    <div className="space-y-1 bg-zinc-50 dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-100 dark:border-zinc-900/50">
                       <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono tracking-wider">
                         Connected Google Account
                       </span>
-                      <p className="font-semibold text-blue-600 dark:text-blue-400 font-mono truncate">
+                      <p className="font-bold text-blue-600 dark:text-blue-400 font-mono truncate">
                         {pendingIdentityConfirm.activeUser.username}
                       </p>
                     </div>
@@ -2358,21 +2358,21 @@ export default function App() {
             <>
               <button
                 onClick={() => setActiveMenu("home")}
-                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                className={`flex-1 min-h-[48px] py-1.5 px-1 flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 cursor-pointer ${
                   activeMenu === "home"
-                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-extrabold bg-blue-50/80 dark:bg-blue-950/50"
                     : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
                 }`}
               >
                 <Home className="w-5 h-5" />
-                <span className="text-[10px] tracking-tight">Home</span>
+                <span className="text-xs font-bold tracking-wide">Home</span>
               </button>
 
               <button
                 onClick={() => setActiveMenu("elections")}
-                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer relative ${
+                className={`flex-1 min-h-[48px] py-1.5 px-1 flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 cursor-pointer relative ${
                   activeMenu === "elections" || activeMenu === "ballot"
-                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-extrabold bg-blue-50/80 dark:bg-blue-950/50"
                     : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
                 }`}
               >
@@ -2404,43 +2404,19 @@ export default function App() {
                     </span>
                   )}
                 </div>
-                <span className="text-[10px] tracking-tight">Elections</span>
+                <span className="text-xs font-bold tracking-wide">Elections</span>
               </button>
 
               <button
                 onClick={() => setActiveMenu("results")}
-                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                className={`flex-1 min-h-[48px] py-1.5 px-1 flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 cursor-pointer ${
                   activeMenu === "results"
-                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-extrabold bg-blue-50/80 dark:bg-blue-950/50"
                     : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
                 }`}
               >
                 <PieChart className="w-5 h-5" />
-                <span className="text-[10px] tracking-tight">Results</span>
-              </button>
-
-              <button
-                onClick={() => setActiveMenu("security")}
-                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
-                  activeMenu === "security"
-                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
-                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-                }`}
-              >
-                <Lock className="w-5 h-5" />
-                <span className="text-[10px] tracking-tight">Security</span>
-              </button>
-
-              <button
-                onClick={() => setActiveMenu("profile")}
-                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
-                  activeMenu === "profile"
-                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
-                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-                }`}
-              >
-                <User className="w-5 h-5" />
-                <span className="text-[10px] tracking-tight">Profile</span>
+                <span className="text-xs font-bold tracking-wide">Results</span>
               </button>
             </>
           )}
@@ -3005,8 +2981,8 @@ export default function App() {
 
       {/* GLOBAL FULL SCREEN LOADER */}
       {isLoading && (
-        <div className="fixed inset-0 z-[100] bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 select-none cursor-wait text-center">
-          <div className="relative w-36 h-36 flex items-center justify-center animate-[pulse_1.5s_infinite] mb-2">
+        <div className="fixed inset-0 z-[100] bg-white dark:bg-zinc-950 backdrop-blur-md flex flex-col items-center justify-center p-6 select-none cursor-wait text-center">
+          <div className="relative w-44 h-44 flex items-center justify-center animate-[pulse_1.5s_infinite] mb-2">
             <img
               src="/images/campusvote loader.png"
               alt="Loading"
@@ -3014,8 +2990,43 @@ export default function App() {
               referrerPolicy="no-referrer"
             />
           </div>
-          <div className="mt-4 w-32 h-1 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden relative">
+          <div className="mt-4 w-36 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden relative">
             <div className="absolute top-0 bottom-0 left-0 bg-[#1565D8] rounded-full animate-[pulse_1s_infinite]" style={{ width: '100%' }}></div>
+          </div>
+        </div>
+      )}
+
+      {/* CUNIMA STUDENT VERIFICATION FULL SCREEN OVERLAY */}
+      {isSearchingProfile && (
+        <div className="fixed inset-0 z-[100] bg-white dark:bg-zinc-950 flex flex-col items-center justify-center p-6 select-none cursor-wait text-center animate-fadeIn">
+          <div className="w-32 h-32 overflow-hidden rounded-3xl border border-zinc-200/60 dark:border-zinc-800/60 shadow-lg flex items-center justify-center bg-white mb-6 animate-[pulse_1.5s_infinite]">
+            <img
+              src="/images/Cunima logo.jpg"
+              alt="CUNIMA Logo"
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          
+          <h3 className="text-base font-black tracking-widest text-zinc-900 dark:text-zinc-50 uppercase font-sans">
+            CUNIMA STUDENT VERIFICATION
+          </h3>
+
+          <div className="flex items-center gap-2 justify-center py-4">
+            <span className="w-3.5 h-3.5 rounded-full bg-[#1565D8] dark:bg-blue-400 animate-bounce [animation-delay:-0.3s]" />
+            <span className="w-3.5 h-3.5 rounded-full bg-[#1565D8] dark:bg-blue-400 animate-bounce [animation-delay:-0.15s]" />
+            <span className="w-3.5 h-3.5 rounded-full bg-[#1565D8] dark:bg-blue-400 animate-bounce" />
+          </div>
+
+          <div className="space-y-1.5 max-w-sm">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider animate-pulse">
+              {searchStateMessage || "Verifying student connection..."}
+            </p>
+            {currentUserDisplay && (
+              <p className="text-xs text-zinc-400 font-medium">
+                Checking records for <strong className="text-zinc-600 dark:text-zinc-300 font-extrabold">{currentUserDisplay}</strong>
+              </p>
+            )}
           </div>
         </div>
       )}
