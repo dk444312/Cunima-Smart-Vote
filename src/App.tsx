@@ -1791,7 +1791,77 @@ export default function App() {
                     </svg>
                     <span>Sign In with @cunima.ac.mw Google</span>
                   </button>
+
+                  {!showCredentialsForm && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCredentialsWarningModal(true)}
+                      className="w-full py-3.5 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 font-semibold text-sm rounded-full transition-all active:scale-95 cursor-pointer mt-2"
+                    >
+                      Other Login Options
+                    </button>
+                  )}
                 </div>
+
+                {showCredentialsForm && (
+                  <>
+                    <div className="relative flex items-center justify-center my-4">
+                      <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
+                      <span className="bg-white dark:bg-zinc-900 px-3 text-[10px] uppercase tracking-wider text-zinc-400 font-bold absolute font-mono">
+                        or authenticate with credentials
+                      </span>
+                    </div>
+
+                    <form onSubmit={handleLogin} className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-zinc-500">
+                          Username
+                        </label>
+                        <input
+                          type="text"
+                          value={usernameInput}
+                          onChange={(e) => setUsernameInput(e.target.value)}
+                          placeholder="Enter your credential username"
+                          className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs font-semibold text-zinc-500">
+                            Password
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setIsPasswordVisible(!isPasswordVisible)}
+                            className="text-[11px] text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                          >
+                            {isPasswordVisible ? "Hide" : "Show"}
+                          </button>
+                        </div>
+                        <input
+                          type={isPasswordVisible ? "text" : "password"}
+                          value={passwordInput}
+                          onChange={(e) => setPasswordInput(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
+                          required
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-2.5 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 font-semibold text-sm rounded-full transition-all active:scale-95 cursor-pointer"
+                      >
+                        {isLoading
+                          ? "Validating Session..."
+                          : "Verify Username & Password"}
+                      </button>
+                    </form>
+                  </>
+                )}
               </div>
             )}
           </main>
