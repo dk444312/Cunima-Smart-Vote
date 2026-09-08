@@ -43,6 +43,7 @@ export default function UpdatesFeed({
   isAdmin,
 }: UpdatesFeedProps) {
   const [mediaUrl, setMediaUrl] = useState("");
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   return (
     <div className="space-y-6">
       {/* COMPOSER (Admin Only) */}
@@ -182,89 +183,107 @@ export default function UpdatesFeed({
                     </span>
                   </button>
 
-                  <div className="flex items-center gap-1.5 cursor-pointer hover:text-[#1565D8] transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpandedComments((prev) => ({
+                        ...prev,
+                        [upd.id]: !prev[upd.id],
+                      }));
+                    }}
+                    className={`flex items-center gap-1.5 cursor-pointer transition-colors text-xs font-bold ${
+                      expandedComments[upd.id]
+                        ? "text-[#1565D8]"
+                        : "text-[#667085] hover:text-[#1565D8]"
+                    }`}
+                  >
                     <MessageCircle className="w-4 h-4" />
                     <span>
-                      {comments.length}{" "}
-                      {comments.length === 1 ? "Comment" : "Comments"}
+                      {expandedComments[upd.id]
+                        ? "Hide Comments"
+                        : comments.length === 0
+                          ? "See Comments (0)"
+                          : `See Comments (${comments.length})`}
                     </span>
-                  </div>
+                  </button>
                 </div>
 
-                <div className="bg-[#F6F8FC] dark:bg-zinc-800/20 rounded-[12px] p-4 space-y-4">
-                  {comments.length > 0 && (
-                    <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-                      {comments.map((c) => {
-                        const isCommentAdmin =
-                          c.username.toLowerCase() === "admin";
-                        return (
-                          <div key={c.id} className="flex gap-2.5">
-                            <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center font-bold text-[9px] text-zinc-600 dark:text-zinc-300 flex-shrink-0">
-                              {c.username.slice(0, 2).toUpperCase()}
-                            </div>
-                            <div className="bg-white dark:bg-zinc-800 border border-zinc-200/50 dark:border-zinc-700 px-3.5 py-2 rounded-2xl max-w-full text-xs">
-                              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                                  {c.username}
-                                </span>
-                                {isCommentAdmin && (
-                                  <div className="flex items-center gap-1">
-                                    <span
-                                      className="inline-flex items-center justify-center bg-[#0095F6] text-white rounded-full w-3.5 h-3.5 shadow-sm"
-                                      title="Meta Verified Admin"
-                                    >
-                                      <Check className="w-2 h-2 stroke-[4.5px]" />
-                                    </span>
-                                    <span className="text-[9px] bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 px-1.5 py-0.2 rounded font-bold">
-                                      Admin
-                                    </span>
-                                  </div>
-                                )}
-                                <span className="text-[9px] text-zinc-400 font-mono">
-                                  {new Date(c.created_at).toLocaleTimeString(
-                                    [],
-                                    { hour: "2-digit", minute: "2-digit" },
-                                  )}
-                                </span>
+                {expandedComments[upd.id] && (
+                  <div className="bg-[#F6F8FC] dark:bg-zinc-800/20 rounded-[12px] p-4 space-y-4 animate-fadeIn">
+                    {comments.length > 0 && (
+                      <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                        {comments.map((c) => {
+                          const isCommentAdmin =
+                            c.username.toLowerCase() === "admin";
+                          return (
+                            <div key={c.id} className="flex gap-2.5">
+                              <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center font-bold text-[9px] text-zinc-600 dark:text-zinc-300 flex-shrink-0">
+                                {c.username.slice(0, 2).toUpperCase()}
                               </div>
-                              <p className="text-zinc-700 dark:text-zinc-300 leading-normal">
-                                {c.content}
-                              </p>
+                              <div className="bg-white dark:bg-zinc-800 border border-zinc-200/50 dark:border-zinc-700 px-3.5 py-2 rounded-2xl max-w-full text-xs">
+                                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                    {c.username}
+                                  </span>
+                                  {isCommentAdmin && (
+                                    <div className="flex items-center gap-1">
+                                      <span
+                                        className="inline-flex items-center justify-center bg-[#0095F6] text-white rounded-full w-3.5 h-3.5 shadow-sm"
+                                        title="Meta Verified Admin"
+                                      >
+                                        <Check className="w-2.5 h-2.5 stroke-[4.5px]" />
+                                      </span>
+                                      <span className="text-[9px] bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 px-1.5 py-0.2 rounded font-bold">
+                                        Admin
+                                      </span>
+                                    </div>
+                                  )}
+                                  <span className="text-[9px] text-zinc-400 font-mono">
+                                    {new Date(c.created_at).toLocaleTimeString(
+                                      [],
+                                      { hour: "2-digit", minute: "2-digit" },
+                                    )}
+                                  </span>
+                                </div>
+                                <p className="text-zinc-700 dark:text-zinc-300 leading-normal">
+                                  {c.content}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          );
+                        })}
+                      </div>
+                    )}
 
-                  {currentUser && (
-                    <form
-                      onSubmit={(e) => handlePostComment(e, upd.id)}
-                      className="flex gap-2 pt-1"
-                    >
-                      <input
-                        type="text"
-                        value={newCommentContents[upd.id] || ""}
-                        onChange={(e) =>
-                          setNewCommentContents((prev) => ({
-                            ...prev,
-                            [upd.id]: e.target.value,
-                          }))
-                        }
-                        placeholder="Write a supportive comment..."
-                        className="flex-1 px-4 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 focus:border-[#1a73e8] dark:focus:border-blue-500 focus:outline-none rounded-xl text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
-                        required
-                      />
-                      <button
-                        type="submit"
-                        disabled={!(newCommentContents[upd.id] || "").trim()}
-                        className="px-4 py-2 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 rounded-xl text-xs font-semibold hover:bg-zinc-800 disabled:opacity-40 transition-colors cursor-pointer"
+                    {currentUser && (
+                      <form
+                        onSubmit={(e) => handlePostComment(e, upd.id)}
+                        className="flex gap-2 pt-1"
                       >
-                        Comment
-                      </button>
-                    </form>
-                  )}
-                </div>
+                        <input
+                          type="text"
+                          value={newCommentContents[upd.id] || ""}
+                          onChange={(e) =>
+                            setNewCommentContents((prev) => ({
+                              ...prev,
+                              [upd.id]: e.target.value,
+                            }))
+                          }
+                          placeholder="Write a supportive comment..."
+                          className="flex-1 px-4 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 focus:border-[#1a73e8] dark:focus:border-blue-500 focus:outline-none rounded-xl text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
+                          required
+                        />
+                        <button
+                          type="submit"
+                          disabled={!(newCommentContents[upd.id] || "").trim()}
+                          className="px-4 py-2 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 rounded-xl text-xs font-semibold hover:bg-zinc-800 disabled:opacity-40 transition-colors cursor-pointer"
+                        >
+                          Comment
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })
