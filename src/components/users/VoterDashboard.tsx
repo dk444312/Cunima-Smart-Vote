@@ -10,12 +10,18 @@ import {
   BadgeAlert,
   Award,
   Lock,
+  Home,
+  PieChart,
+  Users2,
+  KeyRound,
+  ChevronRight,
 } from "lucide-react";
 import {
   LoggedInUser,
   ElectionRow,
   VoteRow,
   ClubMemberRow,
+  ClubRow,
   UpdateRow,
   UpdateLikeRow,
   UpdateCommentRow,
@@ -32,6 +38,7 @@ interface VoterDashboardProps {
   elections: ElectionRow[];
   votes: VoteRow[];
   clubMembers: ClubMemberRow[];
+  clubs?: ClubRow[];
   updates: UpdateRow[];
   updateLikes: Record<string, UpdateLikeRow[]>;
   updateComments: Record<string, UpdateCommentRow[]>;
@@ -56,6 +63,7 @@ export default function VoterDashboard({
   elections,
   votes,
   clubMembers,
+  clubs = [],
   updates,
   updateLikes,
   updateComments,
@@ -85,6 +93,9 @@ export default function VoterDashboard({
   );
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
+
+  // Student Clubs Modal state
+  const [isClubsModalOpen, setIsClubsModalOpen] = useState(false);
 
   // Unlinked student submission modal state
   const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
@@ -250,51 +261,104 @@ export default function VoterDashboard({
 
         return (
         <div className="space-y-6">
-          {/* Voter Header Panel */}
-          <div className="flex flex-col gap-4 items-start bg-transparent p-0">
+          {/* TOP BLUE USER & SYSTEM STATUS CARD */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B2D6B] via-[#0f449e] to-[#1565D8] p-5 sm:p-6 text-white shadow-lg border border-white/20">
+            <div className="absolute right-0 top-0 bottom-0 w-48 sm:w-80 opacity-20 pointer-events-none flex items-center justify-center">
+              <img
+                src="/images/people svg.jpg"
+                alt="Campus Community"
+                className="w-full h-full object-cover object-right"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <div className="relative z-10 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5 sm:gap-4">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/15 border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 backdrop-blur-xs">
+                  <User className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
+                    {linkedStudent ? `${linkedStudent.first_name} ${linkedStudent.surname}` : currentUser.username}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    {linkedStudent && (!linkedStudent.status || linkedStudent.status === "approved") ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 backdrop-blur-xs">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+                        <span>Verified Student</span>
+                      </span>
+                    ) : linkedStudent && linkedStudent.status === "pending" ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-400/20 text-amber-200 border border-amber-400/30 backdrop-blur-xs">
+                        <BadgeAlert className="w-3.5 h-3.5 text-amber-200" />
+                        <span>Registration Pending</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/15 text-blue-100 border border-white/20 backdrop-blur-xs">
+                        <User className="w-3.5 h-3.5 text-blue-200" />
+                        <span>Student Voter</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* VOTER HEADER PANEL: VERIFIED STUDENT STATUS & HEADLINE */}
+          <div className="space-y-4 bg-transparent p-0">
             <div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-2">
                 {linkedStudent && (!linkedStudent.status || linkedStudent.status === "approved") ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Verified Student: {linkedStudent.first_name} {linkedStudent.surname} ({linkedStudent.registration_number})</span>
                   </span>
                 ) : linkedStudent && linkedStudent.status === "pending" ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40">
                     <BadgeAlert className="w-3.5 h-3.5 text-amber-600" />
                     <span>Registration Pending Approval ({linkedStudent.registration_number})</span>
                   </span>
-                ) : null}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsSubmissionModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/40 hover:bg-blue-100 transition-colors cursor-pointer"
+                  >
+                    <BadgeAlert className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Unlinked Account • Click to Submit Student Registration</span>
+                  </button>
+                )}
               </div>
+
               <h2 className="text-3xl font-bold text-[#0B2D6B] dark:text-blue-400 font-['Poppins']">
                 Your Voice. Your Campus.
               </h2>
-              <p className="text-[#667085] dark:text-zinc-400 font-['Montserrat'] mt-2 text-base">
+              <p className="text-[#667085] dark:text-zinc-400 font-['Montserrat'] mt-1 text-base">
                 Participate in the decisions that matter.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-4 mt-2 w-full sm:w-auto">
-              <button
-                type="button"
-                className="flex-1 sm:flex-none px-6 py-3 bg-[#1565D8] hover:bg-[#0D5BE1] text-white font-semibold text-sm rounded-[10px] shadow-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                onClick={() => onNavigate && onNavigate("elections")}
-              >
-                <Vote className="w-4 h-4" />
-                <span>Vote Now</span>
-                {visibleElections.length > 0 && (
-                  <span className="bg-white/20 text-white text-[11px] px-2 py-0.5 rounded-full font-bold ml-1">
-                    {visibleElections.length} Active
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                className="flex-1 sm:flex-none px-6 py-3 bg-white dark:bg-zinc-900 border border-[#1565D8] text-[#1565D8] dark:text-blue-400 font-semibold text-sm rounded-[10px] hover:bg-[#EAF2FF] dark:hover:bg-blue-900/30 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                onClick={() => onNavigate && onNavigate("results")}
-              >
-                <FileText className="w-4 h-4" />
-                <span>See Results</span>
-              </button>
+
+              <div className="flex flex-wrap gap-3 mt-4">
+                <button
+                  type="button"
+                  className="flex-1 sm:flex-none px-6 py-3 bg-[#1565D8] hover:bg-[#0D5BE1] text-white font-semibold text-sm rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  onClick={() => onNavigate && onNavigate("elections")}
+                >
+                  <Vote className="w-4 h-4" />
+                  <span>Vote Now</span>
+                  {visibleElections.length > 0 && (
+                    <span className="bg-white/20 text-white text-[11px] px-2 py-0.5 rounded-full font-bold ml-1">
+                      {visibleElections.length} Active
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 sm:flex-none px-6 py-3 bg-white dark:bg-zinc-900 border border-[#1565D8] text-[#1565D8] dark:text-blue-400 font-semibold text-sm rounded-xl hover:bg-[#EAF2FF] dark:hover:bg-blue-900/30 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  onClick={() => onNavigate && onNavigate("results")}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>See Results</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -329,7 +393,7 @@ export default function VoterDashboard({
             </div>
           )}
 
-          {/* Active Election Notification Banner (if any open elections) */}
+          {/* Active Election Notification Banner (shown when there is a new / active election) */}
           {visibleElections.length > 0 && (
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -360,7 +424,151 @@ export default function VoterDashboard({
             </div>
           )}
 
-          {/* Campus Updates & Posts Focus */}
+          {/* QUICK BUTTONS GRID (VOTE, RESULTS, CLUBS, PROFILE, SECURITY, SUBMISSIONS) */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-mono">
+                Quick Actions
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {/* 1. Vote */}
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate("elections")}
+                className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-[#1565D8] dark:text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Vote className="w-5 h-5" />
+                  </div>
+                  {visibleElections.length > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-[#1565D8] transition-colors">
+                    Vote
+                  </h4>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                    {visibleElections.length > 0 ? `${visibleElections.length} Active` : "Elections"}
+                  </p>
+                </div>
+              </button>
+
+              {/* 2. Results */}
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate("results")}
+                className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <PieChart className="w-5 h-5" />
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 transition-colors">
+                    Results
+                  </h4>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                    Live tallies
+                  </p>
+                </div>
+              </button>
+
+              {/* 3. Clubs */}
+              <button
+                type="button"
+                onClick={() => setIsClubsModalOpen(true)}
+                className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Award className="w-5 h-5" />
+                  </div>
+                  {clubs.length > 0 && (
+                    <span className="text-[10px] font-mono font-bold text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-950 px-1.5 py-0.5 rounded-full">
+                      {clubs.length}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-purple-600 transition-colors">
+                    Clubs
+                  </h4>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                    Societies & Hubs
+                  </p>
+                </div>
+              </button>
+
+              {/* 4. Profile */}
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate("profile")}
+                className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <User className="w-5 h-5" />
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-600 transition-colors">
+                    Profile
+                  </h4>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                    Student ID
+                  </p>
+                </div>
+              </button>
+
+              {/* 5. Security */}
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate("profile")}
+                className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-amber-600 transition-colors">
+                    Security
+                  </h4>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                    Credential Guard
+                  </p>
+                </div>
+              </button>
+
+              {/* 6. Submissions */}
+              <button
+                type="button"
+                onClick={() => setIsSubmissionModalOpen(true)}
+                className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-cyan-600 transition-colors">
+                    Submissions
+                  </h4>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                    Registration Data
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* CAMPUS UPDATES & POSTS FOCUS (BELOW THE QUICK BUTTONS) */}
           <div className="pt-2 space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -396,6 +604,53 @@ export default function VoterDashboard({
       {/* ================== ELECTIONS TAB (DEDICATED ELECTION BOOTH & BALLOTS) ================== */}
       {(activeTab === "elections" || activeTab === "ballot") && (
         <div id="active-elections-section" className="space-y-6">
+          {/* TOP GREEN ELECTION & BALLOT STATION CARD WITH ELECTION COVER IMAGE */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#064E3B] via-[#047857] to-[#059669] p-5 sm:p-6 text-white shadow-lg border border-white/20">
+            <div className="absolute right-0 top-0 bottom-0 w-48 sm:w-80 md:w-96 opacity-25 pointer-events-none flex items-center justify-center">
+              <img
+                src="/images/election cover.jpg"
+                alt="Election Cover"
+                className="w-full h-full object-cover object-center"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5 sm:gap-4">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/15 border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 backdrop-blur-xs">
+                  <Vote className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-100 font-mono">
+                      CUNIMA E-Democracy • Ballot Station
+                    </span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate mt-0.5">
+                    Official Election Booth
+                  </h3>
+                  <p className="text-xs text-emerald-100/90 font-mono truncate">
+                    {visibleElections.length > 0
+                      ? `${visibleElections.length} Active Election${visibleElections.length === 1 ? '' : 's'} Ready For Voting`
+                      : "Official Voting Portal • Tamper-Proof Clearance"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-start md:self-auto">
+                <div className="bg-white/10 border border-white/20 px-3.5 py-2 rounded-2xl backdrop-blur-xs text-left md:text-right">
+                  <span className="text-[10px] text-emerald-100 block uppercase font-mono font-semibold">
+                    Ballot Integrity
+                  </span>
+                  <span className="text-xs font-bold text-emerald-200 flex items-center gap-1.5 md:justify-end">
+                    <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                    Encrypted Secret Ballot
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-1">
             <h3 className="text-2xl font-semibold text-[#0B2D6B] dark:text-blue-400 font-['Poppins']">
               Active Elections
@@ -406,28 +661,37 @@ export default function VoterDashboard({
           </div>
 
           {visibleElections.length === 0 ? (
-            <div className="p-12 text-center bg-white dark:bg-zinc-900 border border-[#E4E7EC] dark:border-zinc-800 rounded-2xl shadow-sm space-y-3">
-              <Vote className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto" />
-              <h3 className="text-lg font-semibold text-[#172033] dark:text-zinc-100 font-['Poppins']">
+            <div className="p-10 md:p-14 text-center bg-white dark:bg-zinc-900 border border-[#E4E7EC] dark:border-zinc-800 rounded-3xl shadow-sm space-y-4">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto flex items-center justify-center">
+                <img
+                  src="/images/election.png.jpg"
+                  alt="No Active Elections"
+                  className="w-full h-full object-contain rounded-2xl drop-shadow-sm"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <h3 className="text-xl font-bold text-[#172033] dark:text-zinc-100 font-['Poppins']">
                 No Active Elections Available
               </h3>
-              <p className="text-sm text-[#667085] dark:text-zinc-400 max-w-sm mx-auto font-['Montserrat']">
+              <p className="text-sm text-[#667085] dark:text-zinc-400 max-w-sm mx-auto font-['Montserrat'] leading-relaxed">
                 There are currently no active elections open for your account. You can check published results or view campus updates.
               </p>
-              <div className="flex items-center justify-center gap-3 pt-2">
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => onNavigate && onNavigate("results")}
-                  className="px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-200 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer"
+                  className="px-4 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-200 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer flex items-center gap-2"
                 >
-                  View Election Results
+                  <img src="/images/election icon.png" alt="Results" className="w-3.5 h-3.5 object-contain" referrerPolicy="no-referrer" />
+                  <span>View Election Results</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => onNavigate && onNavigate("home")}
-                  className="px-4 py-2 bg-[#1565D8] text-white text-xs font-semibold rounded-lg hover:bg-[#0D5BE1] cursor-pointer"
+                  className="px-4 py-2.5 bg-[#1565D8] text-white text-xs font-semibold rounded-xl hover:bg-[#0D5BE1] transition-all cursor-pointer flex items-center gap-2"
                 >
-                  Return to Home Feed
+                  <Home className="w-3.5 h-3.5" />
+                  <span>Return to Home Feed</span>
                 </button>
               </div>
             </div>
@@ -602,15 +866,31 @@ export default function VoterDashboard({
       {activeTab === "results" && (
         <div className="space-y-6">
           {visibleResults.length === 0 ? (
-            <div className="p-12 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-sm">
-              <FileText className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
+            <div className="p-10 md:p-14 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-sm space-y-4">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto flex items-center justify-center">
+                <img
+                  src="/images/election icon.png"
+                  alt="No Published Results"
+                  className="w-full h-full object-contain drop-shadow-sm"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 font-['Poppins']">
                 No Published Results
               </h3>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto mt-1">
-                There are currently no active polls published to the feed.
-                Please verify again later.
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto font-['Montserrat'] leading-relaxed">
+                There are currently no active polls or election outcomes published to the feed. Please verify again later.
               </p>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => onNavigate && onNavigate("home")}
+                  className="px-4 py-2.5 bg-[#1565D8] text-white text-xs font-semibold rounded-xl hover:bg-[#0D5BE1] transition-all cursor-pointer inline-flex items-center gap-2"
+                >
+                  <Home className="w-3.5 h-3.5" />
+                  <span>Return to Home</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -778,19 +1058,24 @@ export default function VoterDashboard({
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col justify-between space-y-4">
                   <div>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-5 h-5 text-emerald-500" />
-                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                          Verified Student Profile
-                        </h3>
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm flex-shrink-0">
+                          <ShieldCheck className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 flex items-center gap-1.5">
+                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                            <span>Verified Student Profile</span>
+                          </h3>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                            Your official CUNIMA verified registration card
+                          </p>
+                        </div>
                       </div>
                       <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40 rounded-full font-mono">
                         Approved
                       </span>
                     </div>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                      Your official CUNIMA verified registration card
-                    </p>
                   </div>
 
                   <div className="space-y-3 text-xs flex-grow my-4">
@@ -956,14 +1241,19 @@ export default function VoterDashboard({
 
               {/* Credentials Card */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-                <div>
-                  <h2 className="text-xl font-normal text-zinc-900 dark:text-zinc-50">
-                    Local Credentials
-                  </h2>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                    Activate/Update a username and password to log in directly
-                    without Google if desired
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-sm flex-shrink-0">
+                    <User className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-normal text-zinc-900 dark:text-zinc-50">
+                      Local Credentials
+                    </h2>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                      Activate/Update a username and password to log in directly
+                      without Google if desired
+                    </p>
+                  </div>
                 </div>
 
                 <form onSubmit={handleUpdateProfile} className="space-y-4">
@@ -1219,6 +1509,91 @@ export default function VoterDashboard({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CLUBS DIRECTORY MODAL */}
+      {isClubsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                    Campus Clubs & Societies
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Explore university student bodies & your active memberships
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsClubsModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center justify-center cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+              {clubs && clubs.length > 0 ? (
+                clubs.map((c) => {
+                  const isMember = clubMembers.some(
+                    (cm) => cm.club_id === c.id && cm.voter_id === currentUser.id,
+                  );
+                  return (
+                    <div
+                      key={c.id}
+                      className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex items-center justify-between gap-4"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                            {c.name}
+                          </h4>
+                        </div>
+                        {c.description && (
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">
+                            {c.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-shrink-0">
+                        {isMember ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                            <Check className="w-3.5 h-3.5" />
+                            Member
+                          </span>
+                        ) : (
+                          <span className="text-xs text-zinc-400 px-2 py-1">
+                            Registered Club
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-zinc-400 text-xs">
+                  No registered clubs found at this time.
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setIsClubsModalOpen(false)}
+                className="w-full py-2.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold text-xs rounded-full hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors cursor-pointer text-center"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

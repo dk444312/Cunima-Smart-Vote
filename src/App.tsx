@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Menu,
+  X,
   Info,
   Moon,
   Sun,
@@ -28,6 +29,8 @@ import {
   Bell,
   List,
   Home,
+  ChevronRight,
+  SlidersHorizontal,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -154,6 +157,7 @@ export default function App() {
 
   // Navigation state
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string>("election");
   const [visiblePasswords, setVisiblePasswords] = useState<
     Record<string, boolean>
@@ -1169,9 +1173,19 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#fafafa] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200 font-sans antialiased flex flex-col">
       {/* GLOBAL BANNER */}
-      <header className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 py-3.5 px-6 sticky top-0 z-40 shadow-sm flex items-center justify-between">
+      <header className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 py-3 px-4 sm:px-6 sticky top-0 z-40 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#0B2D6B] flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          {currentUser && (
+            <button
+              onClick={() => setIsMobileDrawerOpen(true)}
+              className="md:hidden p-2 -ml-1 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+              title="Open Navigation Menu"
+              aria-label="Open Navigation Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+          <div className="w-8 h-8 rounded-full bg-[#0B2D6B] flex items-center justify-center text-white shadow-md shadow-blue-500/20 flex-shrink-0">
             <Vote className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -1183,18 +1197,19 @@ export default function App() {
               <span
                 className={`inline-block w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
               />
-              <span>
-                {isSupabaseConfigured ? "CampusVote" : "Local Mock Storage"}
+              <span className="hidden xs:inline">
+                {isSupabaseConfigured ? "Online Postgres" : "Local Mock Storage"}
               </span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={refreshDatabaseState}
             className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors cursor-pointer"
             title="Refresh tables state"
+            aria-label="Refresh tables state"
           >
             <RefreshCw
               className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
@@ -1205,6 +1220,7 @@ export default function App() {
             onClick={() => setIsDarkMode(!isDarkMode)}
             className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors cursor-pointer"
             title="Toggle theme appearance"
+            aria-label="Toggle theme appearance"
           >
             {isDarkMode ? (
               <Sun className="w-4 h-4" />
@@ -1218,6 +1234,7 @@ export default function App() {
               onClick={handleLogout}
               className="p-2 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg text-red-500 transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
               title="End active session"
+              aria-label="Logout"
             >
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Logout</span>
@@ -1906,13 +1923,46 @@ export default function App() {
           </main>
         ) : (
           /* ================== LOGGED-IN MULTI-DASHBOARD VIEWS ================== */
-          <div className="flex-1 flex flex-col md:flex-row">
-            {/* SIDEBAR FOR ALL ROLES */}
-            <aside
-              className={`w-full md:w-64 bg-[#0B2D6B] text-white flex flex-col justify-between ${isSidebarOpen ? "block" : "hidden md:flex"}`}
-            >
-              <div className="p-4 space-y-6">
-                <span className="text-xs font-bold tracking-wider text-blue-300 uppercase font-mono block px-3">
+          <div className="flex-1 flex flex-col md:flex-row min-h-0">
+            {/* DESKTOP SIDEBAR */}
+            <aside className="hidden md:flex md:w-64 bg-[#0B2D6B] text-white flex-col justify-between flex-shrink-0">
+              <div className="p-4 space-y-4">
+                {/* BLUE USER / SYSTEM CARD ON TOP (MATCHING MOBILE NAV) */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0B2D6B] via-[#0f449e] to-[#1565D8] p-3.5 text-white shadow-md border border-white/15">
+                  <div className="absolute right-0 top-0 bottom-0 w-28 opacity-20 pointer-events-none flex items-center justify-center">
+                    <img
+                      src="/images/Home SVG.jpg"
+                      alt="Campus Accent"
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div className="relative z-10 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 backdrop-blur-xs">
+                      <User className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-200 font-mono">
+                          {currentUser.role.replace("_", " ")}
+                        </span>
+                      </div>
+                      <h3 className="text-xs font-bold text-white truncate leading-tight mt-0.5">
+                        {currentUser.username}
+                      </h3>
+                      <p className="text-[9px] text-blue-200/80 truncate">
+                        {currentUser.role === "admin"
+                          ? "Full Governance Access"
+                          : currentUser.role === "club_manager"
+                            ? "Club Administrator"
+                            : "Verified Student Voter"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <span className="text-[10px] font-bold tracking-wider text-blue-300 uppercase font-mono block px-3 pt-1">
                   {currentUser.role === "admin"
                     ? "Admin Workspace"
                     : currentUser.role === "club_manager"
@@ -2239,15 +2289,47 @@ export default function App() {
                     </>
                   )}
                 </nav>
+
+                {/* DECORATIVE CAMPAIGN SPOTLIGHT MINI-CARD */}
+                <div className="mt-5 p-3 bg-gradient-to-br from-blue-900/60 via-blue-950/80 to-[#0A2558] border border-blue-400/20 rounded-2xl relative overflow-hidden shadow-inner">
+                  <div className="flex items-center justify-between gap-2 relative z-10">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-200 font-mono">
+                          CUNIMA Portal
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-bold text-white leading-tight">Digital Democracy</p>
+                      <p className="text-[9px] text-blue-200/80 leading-tight">Verifiable Student Elections</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-blue-800/50 p-1 flex-shrink-0 flex items-center justify-center border border-blue-400/30">
+                      <img
+                        src="/images/election icon.png"
+                        alt="Elections"
+                        className="w-full h-full object-contain drop-shadow"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="p-4 border-t border-blue-900/50 text-[10px] text-blue-300 font-mono">
-                <p>Logged as: {currentUser.username}</p>
+              {/* DESKTOP SIDEBAR FOOTER */}
+              <div className="p-3 bg-blue-950/70 border-t border-blue-900/60 flex items-center justify-between gap-2 text-[10px] text-blue-200">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                  <span className="font-mono text-[9px] text-blue-300">CUNIMA E-Democracy</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span className="text-[9px] text-blue-300 font-mono">Online</span>
+                </div>
               </div>
             </aside>
 
             {/* MAIN PORTLET CONTAINER */}
-            <main className="flex-1 p-6 md:p-8 max-w-6xl mx-auto w-full overflow-y-auto">
+            <main className="flex-1 p-4 sm:p-6 md:p-8 pb-28 md:pb-8 max-w-6xl mx-auto w-full overflow-y-auto min-w-0">
               {isLoading && (
                 <div className="mb-4 p-3 rounded-full bg-blue-50/50 dark:bg-blue-950/10 text-blue-600 dark:text-blue-400 text-xs font-mono flex items-center gap-2 border border-blue-100 dark:border-blue-900/20">
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -2352,6 +2434,7 @@ export default function App() {
                   currentUser={currentUser}
                   students={students}
                   elections={elections}
+                  clubs={clubs}
                   votes={votes}
                   clubMembers={clubMembers}
                   updates={updates}
@@ -2374,6 +2457,620 @@ export default function App() {
         )}
       </div>
 
+      {/* MOBILE BOTTOM NAVIGATION (Shown for all logged-in roles on small viewports) */}
+      {currentUser && (
+        <nav
+          aria-label="Mobile Bottom Navigation"
+          className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 px-2 py-1 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] flex items-center justify-around"
+        >
+          {currentUser.role === "voter" && (
+            <>
+              <button
+                onClick={() => setActiveMenu("home")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                  activeMenu === "home"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <Home className="w-5 h-5" />
+                <span className="text-[10px] tracking-tight">Home</span>
+              </button>
+
+              <button
+                onClick={() => setActiveMenu("elections")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer relative ${
+                  activeMenu === "elections" || activeMenu === "ballot"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <div className="relative">
+                  <Vote className="w-5 h-5" />
+                  {elections.filter(
+                    (e) =>
+                      e.status === "active" &&
+                      (!e.club_id ||
+                        clubMembers.some(
+                          (cm) =>
+                            cm.club_id === e.club_id &&
+                            cm.voter_id === currentUser.id,
+                        )),
+                  ).length > 0 && (
+                    <span className="absolute -top-1 -right-2 bg-blue-600 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                      {
+                        elections.filter(
+                          (e) =>
+                            e.status === "active" &&
+                            (!e.club_id ||
+                              clubMembers.some(
+                                (cm) =>
+                                  cm.club_id === e.club_id &&
+                                  cm.voter_id === currentUser.id,
+                              )),
+                        ).length
+                      }
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] tracking-tight">Elections</span>
+              </button>
+
+              <button
+                onClick={() => setActiveMenu("results")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                  activeMenu === "results"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <PieChart className="w-5 h-5" />
+                <span className="text-[10px] tracking-tight">Results</span>
+              </button>
+
+              <button
+                onClick={() => setActiveMenu("profile")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                  activeMenu === "profile"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <User className="w-5 h-5" />
+                <span className="text-[10px] tracking-tight">Profile</span>
+              </button>
+            </>
+          )}
+
+          {currentUser.role === "club_manager" && (
+            <>
+              <button
+                onClick={() => setActiveMenu("club_elections")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                  activeMenu === "club_elections"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <Vote className="w-5 h-5" />
+                <span className="text-[10px] tracking-tight">Elections</span>
+              </button>
+
+              <button
+                onClick={() => setActiveMenu("club_members")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                  activeMenu === "club_members"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <Users2 className="w-5 h-5" />
+                <span className="text-[10px] tracking-tight">Roster</span>
+              </button>
+
+              <button
+                onClick={() => setActiveMenu("feed")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                  activeMenu === "feed"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <List className="w-5 h-5" />
+                <span className="text-[10px] tracking-tight">Feed</span>
+              </button>
+
+              <button
+                onClick={() => setActiveMenu("profile")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                  activeMenu === "profile"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <User className="w-5 h-5" />
+                <span className="text-[10px] tracking-tight">Profile</span>
+              </button>
+            </>
+          )}
+
+          {currentUser.role === "admin" && (
+            <>
+              <button
+                onClick={() => setActiveMenu("election")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer relative ${
+                  activeMenu === "election"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <div className="relative">
+                  <Vote className="w-5 h-5" />
+                  <span className="absolute -top-1 -right-2 bg-blue-600 text-white text-[9px] px-1 rounded-full font-bold">
+                    {elections.filter((e) => !e.club_id).length}
+                  </span>
+                </div>
+                <span className="text-[10px] tracking-tight">Elections</span>
+              </button>
+
+              <button
+                onClick={() => setActiveMenu("candidates")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer relative ${
+                  activeMenu === "candidates"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <div className="relative">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] tracking-tight">Candidates</span>
+              </button>
+
+              <button
+                onClick={() => setActiveMenu("students")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer relative ${
+                  activeMenu === "students"
+                    ? "text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50/80 dark:bg-emerald-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <div className="relative">
+                  <Database className="w-5 h-5" />
+                  <span className="absolute -top-1 -right-2 bg-emerald-600 text-white text-[9px] px-1 rounded-full font-bold">
+                    {students.length}
+                  </span>
+                </div>
+                <span className="text-[10px] tracking-tight">Students</span>
+              </button>
+
+              <button
+                onClick={() => setActiveMenu("voters")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer relative ${
+                  activeMenu === "voters"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <div className="relative">
+                  <Users2 className="w-5 h-5" />
+                  <span className="absolute -top-1 -right-2 bg-zinc-700 text-white text-[9px] px-1 rounded-full font-bold">
+                    {voters.length}
+                  </span>
+                </div>
+                <span className="text-[10px] tracking-tight">Users</span>
+              </button>
+
+              <button
+                onClick={() => setIsMobileDrawerOpen(true)}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                  [
+                    "clubs",
+                    "results",
+                    "updates",
+                    "profile",
+                    "verified",
+                    "sql_db",
+                  ].includes(activeMenu)
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <SlidersHorizontal className="w-5 h-5" />
+                <span className="text-[10px] tracking-tight">More</span>
+              </button>
+            </>
+          )}
+        </nav>
+      )}
+
+      {/* MOBILE EXPANDED DRAWER SHEET */}
+      <AnimatePresence>
+        {isMobileDrawerOpen && currentUser && (
+          <div className="fixed inset-0 z-50 flex flex-col justify-end md:hidden">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileDrawerOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="relative bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 rounded-t-3xl p-5 sm:p-6 shadow-2xl max-h-[85vh] overflow-y-auto space-y-4"
+            >
+              {/* Decorative Drawer Header Banner */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0B2D6B] via-[#0f449e] to-[#1565D8] p-4 text-white shadow-md">
+                <div className="absolute right-0 top-0 bottom-0 w-28 opacity-20 pointer-events-none flex items-center justify-center">
+                  <img
+                    src="/images/Home SVG.jpg"
+                    alt="Campus Accent"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="relative z-10 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 backdrop-blur-xs">
+                      <User className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white leading-tight">
+                        {currentUser.username}
+                      </h3>
+                      <span className="text-[10px] text-blue-200 uppercase font-mono tracking-wider">
+                        {currentUser.role.replace("_", " ")}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsMobileDrawerOpen(false)}
+                    className="p-1.5 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Navigation Options */}
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider px-2 font-mono">
+                  Navigation Menu
+                </span>
+
+                {currentUser.role === "admin" && (
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <button
+                      onClick={() => {
+                        setActiveMenu("election");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "election"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Vote className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Elections</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("candidates");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "candidates"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Candidates</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("students");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "students"
+                          ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Database className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>Students DB</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("voters");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "voters"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Users2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Users</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("clubs");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "clubs"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Award className="w-4 h-4 text-amber-500" />
+                      <span>Clubs</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("updates");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "updates"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Megaphone className="w-4 h-4 text-purple-500" />
+                      <span>Socials</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("results");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "results"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <List className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Publish Feed</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("verified");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "verified"
+                          ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                      <span>Verified Sync</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("sql_db");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "sql_db"
+                          ? "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Database className="w-4 h-4 text-purple-500" />
+                      <span>SQL Inspector</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("profile");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "profile"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>My Profile</span>
+                    </button>
+                  </div>
+                )}
+
+                {currentUser.role === "club_manager" && (
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <button
+                      onClick={() => {
+                        setActiveMenu("club_elections");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "club_elections"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Vote className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Club Elections</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("club_members");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "club_members"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Users2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Roster</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("feed");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "feed"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <List className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Feed</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("profile");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "profile"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>My Profile</span>
+                    </button>
+                  </div>
+                )}
+
+                {currentUser.role === "voter" && (
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <button
+                      onClick={() => {
+                        setActiveMenu("home");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "home"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Home className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Home Feed</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("elections");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "elections" || activeMenu === "ballot"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Vote className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Elections</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("results");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "results"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <PieChart className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Results</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("profile");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "profile"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>My Profile</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Decorative Bottom Banner */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-800/60 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 p-1.5 flex-shrink-0 flex items-center justify-center border border-blue-200/50 dark:border-blue-900/50">
+                  <img
+                    src="/images/election icon.png"
+                    alt="Ballot"
+                    className="w-full h-full object-contain"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                    CUNIMA Student Democracy
+                  </p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+                    Official voting portal powered by Socrates Engine
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <button
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300 p-2.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  {isDarkMode ? (
+                    <Sun className="w-4 h-4 text-amber-500" />
+                  ) : (
+                    <Moon className="w-4 h-4 text-zinc-500" />
+                  )}
+                  <span>{isDarkMode ? "Light Mode" : "Dark Mode"}</span>
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 text-xs font-semibold text-red-600 dark:text-red-400 p-2.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* FLOATING TOAST FEEDBACK */}
       <AnimatePresence>
         {toastMessage && (
@@ -2381,7 +3078,7 @@ export default function App() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 30 }}
-            className="fixed bottom-6 right-6 z-50 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-5 py-3.5 rounded-2xl shadow-xl max-w-sm text-xs font-semibold flex items-center gap-2 border border-zinc-800 dark:border-zinc-200"
+            className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-4 py-3.5 rounded-2xl shadow-xl max-w-xs sm:max-w-sm text-xs font-semibold flex items-center gap-2 border border-zinc-800 dark:border-zinc-200"
           >
             <Info className="w-4 h-4 text-blue-400 dark:text-blue-600 flex-shrink-0" />
             <span>{toastMessage}</span>
