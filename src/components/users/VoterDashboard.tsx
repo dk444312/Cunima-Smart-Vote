@@ -32,6 +32,7 @@ import {
 } from "../../types.ts";
 import { dbService, getElectionPositions } from "../../lib/supabase.ts";
 import UpdatesFeed from "../shared/UpdatesFeed.tsx";
+import { getUserAvatarUrl } from "../../lib/avatar.ts";
 
 interface VoterDashboardProps {
   currentUser: LoggedInUser;
@@ -112,6 +113,18 @@ export default function VoterDashboard({
   const [subYear, setSubYear] = useState("");
   const [subCum, setSubCum] = useState("");
   const [subGender, setSubGender] = useState("M");
+
+  const normUser = currentUser.username.trim().toLowerCase();
+  const linkedStudent = students.find((s) => {
+    const sEmail = s.email ? s.email.trim().toLowerCase() : "";
+    const sReg = s.registration_number ? s.registration_number.trim().toLowerCase() : "";
+    const sCum = s.cum_number ? s.cum_number.trim().toLowerCase() : "";
+    if (sEmail && sEmail === normUser) return true;
+    if (sReg && sReg === normUser) return true;
+    if (sCum && sCum === normUser) return true;
+    if (sEmail && normUser.includes("@") && sEmail.split("@")[0] === normUser.split("@")[0]) return true;
+    return false;
+  });
 
   const handleSubmitStudentProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,20 +259,7 @@ export default function VoterDashboard({
   return (
     <div className="space-y-6">
       {/* ================== HOME TAB (POSTS & UPDATES FOCUS WITH VOTE / RESULTS CTAS) ================== */}
-      {activeTab === "home" && (() => {
-        const normUser = currentUser.username.trim().toLowerCase();
-        const linkedStudent = students.find((s) => {
-          const sEmail = s.email ? s.email.trim().toLowerCase() : "";
-          const sReg = s.registration_number ? s.registration_number.trim().toLowerCase() : "";
-          const sCum = s.cum_number ? s.cum_number.trim().toLowerCase() : "";
-          if (sEmail && sEmail === normUser) return true;
-          if (sReg && sReg === normUser) return true;
-          if (sCum && sCum === normUser) return true;
-          if (sEmail && normUser.includes("@") && sEmail.split("@")[0] === normUser.split("@")[0]) return true;
-          return false;
-        });
-
-        return (
+      {activeTab === "home" && (
         <div className="space-y-6">
           {/* TOP BLUE USER & SYSTEM STATUS CARD */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B2D6B] via-[#0f449e] to-[#1565D8] p-5 sm:p-6 text-white shadow-lg border border-white/20">
@@ -273,8 +273,13 @@ export default function VoterDashboard({
             </div>
             <div className="relative z-10 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3.5 sm:gap-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/15 border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 backdrop-blur-xs">
-                  <User className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 bg-white/10 backdrop-blur-xs">
+                  <img
+                    src={getUserAvatarUrl(linkedStudent?.gender)}
+                    alt="Profile Photo"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
@@ -282,9 +287,9 @@ export default function VoterDashboard({
                   </h3>
                   <div className="flex items-center gap-2 mt-1.5">
                     {linkedStudent && (!linkedStudent.status || linkedStudent.status === "approved") ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 backdrop-blur-xs">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
-                        <span>Verified Student</span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-xs shadow-xs">
+                        <ShieldCheck className="w-3.5 h-3.5 text-white" />
+                        <span className="text-white font-medium">Verified Student</span>
                       </span>
                     ) : linkedStudent && linkedStudent.status === "pending" ? (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-400/20 text-amber-200 border border-amber-400/30 backdrop-blur-xs">
@@ -303,21 +308,11 @@ export default function VoterDashboard({
             </div>
           </div>
 
-          {/* VOTER HEADER PANEL: VERIFIED STUDENT STATUS & HEADLINE */}
+          {/* VOTER HEADER PANEL: HEADLINE & ACTION BUTTONS */}
           <div className="space-y-4 bg-transparent p-0">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                {linkedStudent && (!linkedStudent.status || linkedStudent.status === "approved") ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Verified Student: {linkedStudent.first_name} {linkedStudent.surname} ({linkedStudent.registration_number})</span>
-                  </span>
-                ) : linkedStudent && linkedStudent.status === "pending" ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40">
-                    <BadgeAlert className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Registration Pending Approval ({linkedStudent.registration_number})</span>
-                  </span>
-                ) : (
+              {!linkedStudent && (
+                <div className="mb-2">
                   <button
                     type="button"
                     onClick={() => setIsSubmissionModalOpen(true)}
@@ -326,8 +321,8 @@ export default function VoterDashboard({
                     <BadgeAlert className="w-3.5 h-3.5 text-blue-600" />
                     <span>Unlinked Account • Click to Submit Student Registration</span>
                   </button>
-                )}
-              </div>
+                </div>
+              )}
 
               <h2 className="text-3xl font-bold text-[#0B2D6B] dark:text-blue-400 font-['Poppins']">
                 Your Voice. Your Campus.
@@ -439,7 +434,7 @@ export default function VoterDashboard({
                 className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
               >
                 <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-[#1565D8] dark:text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-9 h-9 rounded-full bg-[#1565D8] dark:bg-blue-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
                     <Vote className="w-5 h-5" />
                   </div>
                   {visibleElections.length > 0 && (
@@ -463,7 +458,7 @@ export default function VoterDashboard({
                 className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
               >
                 <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-9 h-9 rounded-full bg-indigo-600 dark:bg-indigo-500 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
                     <PieChart className="w-5 h-5" />
                   </div>
                 </div>
@@ -484,7 +479,7 @@ export default function VoterDashboard({
                 className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
               >
                 <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-9 h-9 rounded-full bg-purple-600 dark:bg-purple-500 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
                     <Award className="w-5 h-5" />
                   </div>
                   {clubs.length > 0 && (
@@ -510,7 +505,7 @@ export default function VoterDashboard({
                 className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
               >
                 <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-9 h-9 rounded-full bg-emerald-600 dark:bg-emerald-500 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
                     <User className="w-5 h-5" />
                   </div>
                 </div>
@@ -527,11 +522,11 @@ export default function VoterDashboard({
               {/* 5. Security */}
               <button
                 type="button"
-                onClick={() => onNavigate && onNavigate("profile")}
+                onClick={() => onNavigate && onNavigate("security")}
                 className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
               >
                 <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-9 h-9 rounded-full bg-amber-600 dark:bg-amber-500 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
                     <Lock className="w-5 h-5" />
                   </div>
                 </div>
@@ -552,7 +547,7 @@ export default function VoterDashboard({
                 className="group p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer text-left flex flex-col justify-between gap-3"
               >
                 <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-9 h-9 rounded-full bg-cyan-600 dark:bg-cyan-500 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
                     <FileText className="w-5 h-5" />
                   </div>
                 </div>
@@ -598,13 +593,12 @@ export default function VoterDashboard({
             />
           </div>
         </div>
-        );
-      })()}
+      )}
 
       {/* ================== ELECTIONS TAB (DEDICATED ELECTION BOOTH & BALLOTS) ================== */}
       {(activeTab === "elections" || activeTab === "ballot") && (
         <div id="active-elections-section" className="space-y-6">
-          {/* TOP GREEN ELECTION & BALLOT STATION CARD WITH ELECTION COVER IMAGE */}
+          {/* TOP GREEN ELECTION & BALLOT STATION CARD WITH ELECTION COVER IMAGE (MINIMALIST) */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#064E3B] via-[#047857] to-[#059669] p-5 sm:p-6 text-white shadow-lg border border-white/20">
             <div className="absolute right-0 top-0 bottom-0 w-48 sm:w-80 md:w-96 opacity-25 pointer-events-none flex items-center justify-center">
               <img
@@ -614,38 +608,18 @@ export default function VoterDashboard({
                 referrerPolicy="no-referrer"
               />
             </div>
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="relative z-10 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3.5 sm:gap-4">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/15 border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 backdrop-blur-xs">
                   <Vote className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-100 font-mono">
-                      CUNIMA E-Democracy • Ballot Station
-                    </span>
-                  </div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate mt-0.5">
-                    Official Election Booth
+                  <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
+                    Election Portal
                   </h3>
-                  <p className="text-xs text-emerald-100/90 font-mono truncate">
-                    {visibleElections.length > 0
-                      ? `${visibleElections.length} Active Election${visibleElections.length === 1 ? '' : 's'} Ready For Voting`
-                      : "Official Voting Portal • Tamper-Proof Clearance"}
+                  <p className="text-xs sm:text-sm text-emerald-100/90 mt-0.5 font-['Montserrat']">
+                    Vote for your candidates
                   </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 self-start md:self-auto">
-                <div className="bg-white/10 border border-white/20 px-3.5 py-2 rounded-2xl backdrop-blur-xs text-left md:text-right">
-                  <span className="text-[10px] text-emerald-100 block uppercase font-mono font-semibold">
-                    Ballot Integrity
-                  </span>
-                  <span className="text-xs font-bold text-emerald-200 flex items-center gap-1.5 md:justify-end">
-                    <ShieldCheck className="w-4 h-4 text-emerald-300" />
-                    Encrypted Secret Ballot
-                  </span>
                 </div>
               </div>
             </div>
@@ -865,6 +839,38 @@ export default function VoterDashboard({
 
       {activeTab === "results" && (
         <div className="space-y-6">
+          {/* TOP BLUE RESULTS HEADER CARD */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B2D6B] via-[#0f449e] to-[#1565D8] p-5 sm:p-6 text-white shadow-lg border border-white/20">
+            <div className="absolute right-0 top-0 bottom-0 w-48 sm:w-80 opacity-20 pointer-events-none flex items-center justify-center">
+              <img
+                src="/images/results.jpg"
+                alt="Results Background"
+                className="w-full h-full object-cover object-right"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <div className="relative z-10 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5 sm:gap-4">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 bg-white/10 backdrop-blur-xs">
+                  <img
+                    src="/images/results.jpg"
+                    alt="Results"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
+                    Election Results
+                  </h3>
+                  <p className="text-xs sm:text-sm text-blue-100/90 mt-0.5">
+                    Live tallies, verified votes, and official election outcomes
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {visibleResults.length === 0 ? (
             <div className="p-10 md:p-14 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-sm space-y-4">
               <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto flex items-center justify-center">
@@ -1049,30 +1055,61 @@ export default function VoterDashboard({
           });
 
           return (
-            <div
-              className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto"
-              id="voter_profile_dashboard"
-            >
-              {/* Student Profile Card */}
-              {linkedStudent && (!linkedStudent.status || linkedStudent.status === "approved") ? (
+            <div className="space-y-6 max-w-4xl mx-auto" id="voter_profile_dashboard">
+              {/* TOP BLUE PROFILE CARD WITH PROFILE IMAGE */}
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B2D6B] via-[#0f449e] to-[#1565D8] p-5 sm:p-6 text-white shadow-lg border border-white/20">
+                <div className="absolute right-0 top-0 bottom-0 w-48 sm:w-80 opacity-25 pointer-events-none flex items-center justify-center">
+                  <img
+                    src="/images/Profile.png"
+                    alt="Profile Background"
+                    className="w-full h-full object-cover object-right"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="relative z-10 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5 sm:gap-4">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 bg-white/10 backdrop-blur-xs">
+                      <User className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
+                        {linkedStudent ? `${linkedStudent.first_name} ${linkedStudent.surname}` : currentUser.username}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-blue-100/90 mt-0.5 font-['Montserrat']">
+                        {linkedStudent
+                          ? `Reg No: ${linkedStudent.registration_number} • ${linkedStudent.program_name}`
+                          : "Student Profile & Credentials"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="max-w-2xl mx-auto">
+                {/* Student Profile Card */}
+                {linkedStudent && (!linkedStudent.status || linkedStudent.status === "approved") ? (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col justify-between space-y-4">
                   <div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm flex-shrink-0">
-                          <ShieldCheck className="w-6 h-6" />
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden border border-blue-200 dark:border-blue-900/50 flex items-center justify-center text-[#1565D8] dark:text-blue-400 shadow-sm flex-shrink-0 bg-blue-50">
+                          <img
+                            src={getUserAvatarUrl(linkedStudent?.gender)}
+                            alt="Student Profile Photo"
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
                         </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 flex items-center gap-1.5">
-                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                            <span>Verified Student Profile</span>
+                        <div className="min-w-0">
+                          <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-50 leading-tight truncate">
+                            Verified Profile
                           </h3>
-                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                            Your official CUNIMA verified registration card
+                          <p className="text-xs sm:text-sm text-[#1565D8] dark:text-blue-400 font-semibold tracking-tight mt-0.5 leading-tight truncate">
+                            CUNIMA Active Student
                           </p>
                         </div>
                       </div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40 rounded-full font-mono">
+                      <span className="flex-shrink-0 text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40 rounded-full">
                         Approved
                       </span>
                     </div>
@@ -1081,7 +1118,7 @@ export default function VoterDashboard({
                   <div className="space-y-3 text-xs flex-grow my-4">
                     <div className="grid grid-cols-2 gap-3 bg-zinc-50 dark:bg-zinc-950 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-900">
                       <div>
-                        <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono">
+                        <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider">
                           First Name
                         </span>
                         <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
@@ -1089,7 +1126,7 @@ export default function VoterDashboard({
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono">
+                        <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider">
                           Surname
                         </span>
                         <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
@@ -1100,15 +1137,15 @@ export default function VoterDashboard({
 
                     <div className="space-y-2 bg-zinc-50 dark:bg-zinc-950 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-900">
                       <div>
-                        <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono">
+                        <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider">
                           Registration ID
                         </span>
-                        <span className="text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300">
+                        <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
                           {linkedStudent.registration_number}
                         </span>
                       </div>
                       <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900">
-                        <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono">
+                        <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider">
                           Program Course
                         </span>
                         <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
@@ -1117,18 +1154,18 @@ export default function VoterDashboard({
                       </div>
                       <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900 flex justify-between items-center">
                         <div>
-                          <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono">
+                          <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider">
                             Academic Year
                           </span>
-                          <span className="text-xs font-semibold font-mono text-zinc-700 dark:text-zinc-300">
+                          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                             {linkedStudent.academic_year}
                           </span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono text-right">
+                          <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider text-right">
                             CUM Number
                           </span>
-                          <span className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400 block text-right">
+                          <span className="text-sm font-bold text-[#1565D8] dark:text-blue-400 block text-right">
                             {linkedStudent.cum_number}
                           </span>
                         </div>
@@ -1136,8 +1173,8 @@ export default function VoterDashboard({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-400 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/30 text-[11px] font-mono">
-                    <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                  <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 p-3 rounded-xl border border-blue-100 dark:border-blue-900/30 text-[11px] font-semibold">
+                    <ShieldCheck className="w-4 h-4 flex-shrink-0 text-[#1565D8] dark:text-blue-400" />
                     <span>ELIGIBILITY: REGISTERED VOTER APPROVED</span>
                   </div>
                 </div>
@@ -1238,120 +1275,138 @@ export default function VoterDashboard({
                   </button>
                 </div>
               )}
-
-              {/* Credentials Card */}
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-sm flex-shrink-0">
-                    <User className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-normal text-zinc-900 dark:text-zinc-50">
-                      Local Credentials
-                    </h2>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      Activate/Update a username and password to log in directly
-                      without Google if desired
-                    </p>
-                  </div>
-                </div>
-
-                <form onSubmit={handleUpdateProfile} className="space-y-4">
-                  {profileError && (
-                    <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-xs font-medium flex items-center gap-2 border border-red-200 dark:border-red-900/50">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      <span>{profileError}</span>
-                    </div>
-                  )}
-
-                  {profileMessage && (
-                    <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-medium flex items-center gap-2 border border-emerald-200 dark:border-emerald-900/50">
-                      <Check className="w-4 h-4 flex-shrink-0 text-emerald-500" />
-                      <span>{profileMessage}</span>
-                    </div>
-                  )}
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-zinc-500">
-                      Username / Email
-                    </label>
-                    <input
-                      type="text"
-                      value={profileUsername}
-                      onChange={(e) => setProfileUsername(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-[#1a73e8] dark:focus:border-blue-500 focus:outline-none text-sm text-zinc-900 dark:text-zinc-100 font-medium"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-zinc-500">
-                      New Password
-                    </label>
-                    <input
-                      type="password"
-                      placeholder="Set direct login password"
-                      value={profilePassword}
-                      onChange={(e) => setProfilePassword(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-[#1a73e8] dark:focus:border-blue-500 focus:outline-none text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-zinc-500">
-                      Confirm Password
-                    </label>
-                    <input
-                      type="password"
-                      placeholder="Confirm password"
-                      value={profileConfirmPassword}
-                      onChange={(e) =>
-                        setProfileConfirmPassword(e.target.value)
-                      }
-                      className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-[#1a73e8] dark:focus:border-blue-500 focus:outline-none text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
-                    />
-                  </div>
-
-                  <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/40 rounded-2xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                        <span className="text-xs font-semibold text-zinc-950 dark:text-zinc-50">
-                          🔒 Activate Credential Guard Lock
-                        </span>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={profileGuardLocked}
-                          onChange={(e) =>
-                            setProfileGuardLocked(e.target.checked)
-                          }
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-zinc-200 dark:bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
-                      </label>
-                    </div>
-                    <p className="text-[10px] text-zinc-400">
-                      When active, signing in with your Google email will
-                      require validating this local password as a mandatory
-                      secondary authentication lock.
-                    </p>
-                  </div>
-
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      className="w-full py-2.5 bg-[#1565D8] hover:bg-[#0D5BE1] text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
-                    >
-                      Save Credentials
-                    </button>
-                  </div>
-                </form>
-              </div>
             </div>
+          </div>
           );
         })()}
+
+      {/* ================== SECURITY & CREDENTIALS TAB ================== */}
+      {activeTab === "security" && (
+        <div className="space-y-6 max-w-2xl mx-auto" id="voter_security_dashboard">
+          {/* TOP BLUE SECURITY CARD */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B2D6B] via-[#0f449e] to-[#1565D8] p-5 sm:p-6 text-white shadow-lg border border-white/20">
+            <div className="absolute right-0 top-0 bottom-0 w-48 sm:w-80 opacity-20 pointer-events-none flex items-center justify-center">
+              <img
+                src="/images/security.jpg"
+                alt="Security Background"
+                className="w-full h-full object-cover object-right"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <div className="relative z-10 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5 sm:gap-4">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 bg-white/10 backdrop-blur-xs">
+                  <img
+                    src="/images/security.jpg"
+                    alt="Security Credentials"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
+                    Security & Credentials
+                  </h3>
+                  <p className="text-xs sm:text-sm text-blue-100/90 mt-0.5 font-['Montserrat']">
+                    Manage direct authentication and account passwords
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Credentials Card */}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl overflow-hidden border border-blue-200 dark:border-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-sm flex-shrink-0 bg-blue-50">
+                <img
+                  src="/images/security.jpg"
+                  alt="Security Credentials"
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div>
+                <h2 className="text-xl font-normal text-zinc-900 dark:text-zinc-50">
+                  Local Credentials
+                </h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  Activate/Update a username and password to log in directly
+                  without Google if desired
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              {profileError && (
+                <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-xs font-medium flex items-center gap-2 border border-red-200 dark:border-red-900/50">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{profileError}</span>
+                </div>
+              )}
+
+              {profileMessage && (
+                <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-medium flex items-center gap-2 border border-emerald-200 dark:border-emerald-900/50">
+                  <Check className="w-4 h-4 flex-shrink-0 text-emerald-500" />
+                  <span>{profileMessage}</span>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-500">
+                  Username / Email
+                </label>
+                <input
+                  type="text"
+                  value={profileUsername}
+                  onChange={(e) => setProfileUsername(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-[#1a73e8] dark:focus:border-blue-500 focus:outline-none text-sm text-zinc-900 dark:text-zinc-100 font-medium"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-500">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  placeholder="Set direct login password"
+                  value={profilePassword}
+                  onChange={(e) => setProfilePassword(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-[#1a73e8] dark:focus:border-blue-500 focus:outline-none text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-500">
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  placeholder="Confirm password"
+                  value={profileConfirmPassword}
+                  onChange={(e) =>
+                    setProfileConfirmPassword(e.target.value)
+                  }
+                  className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-[#1a73e8] dark:focus:border-blue-500 focus:outline-none text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
+                />
+              </div>
+
+
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="w-full py-2.5 bg-[#1565D8] hover:bg-[#0D5BE1] text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
+                >
+                  Save Credentials
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Student Profile Submission Modal */}
       {isSubmissionModalOpen && (
@@ -1375,140 +1430,176 @@ export default function VoterDashboard({
               </button>
             </div>
 
-            <form onSubmit={handleSubmitStudentProfile} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    value={subFirstName}
-                    onChange={(e) => setSubFirstName(e.target.value)}
-                    placeholder="e.g. Desire"
-                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
-                    required
-                  />
+            {linkedStudent ? (
+              <div className="p-6 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-[#1565D8] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 space-y-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#1565D8] text-white flex items-center justify-center flex-shrink-0">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                      Voter Connection Status
+                    </h4>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Your CUNIMA registration status is active.
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                    Surname
-                  </label>
-                  <input
-                    type="text"
-                    value={subSurname}
-                    onChange={(e) => setSubSurname(e.target.value)}
-                    placeholder="e.g. Kandodo"
-                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
-                    required
-                  />
-                </div>
-              </div>
+                
+                <p className="text-sm font-semibold leading-relaxed text-blue-800 dark:text-blue-300">
+                  you are already connected voter
+                </p>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                  University Email (@cunima.ac.mw)
-                </label>
-                <input
-                  type="email"
-                  value={subEmail}
-                  onChange={(e) => setSubEmail(e.target.value)}
-                  placeholder="e.g. desire.kandodo@cunima.ac.mw"
-                  className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
-                  required
-                />
-              </div>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  Your voter credentials are fully verified and linked to <span className="font-semibold">{linkedStudent.first_name} {linkedStudent.surname}</span> (Registration ID: <span className="font-mono font-medium">{linkedStudent.registration_number}</span>). You are eligible to cast votes in all active student elections.
+                </p>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                    Registration ID
-                  </label>
-                  <input
-                    type="text"
-                    value={subRegNumber}
-                    onChange={(e) => setSubRegNumber(e.target.value)}
-                    placeholder="e.g. REG/CS/2026/011"
-                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                    CUM Number
-                  </label>
-                  <input
-                    type="text"
-                    value={subCum}
-                    onChange={(e) => setSubCum(e.target.value)}
-                    placeholder="e.g. 3.75 or 76.5"
-                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                  Program Course
-                </label>
-                <input
-                  type="text"
-                  value={subProgram}
-                  onChange={(e) => setSubProgram(e.target.value)}
-                  placeholder="e.g. BSc Computer Science"
-                  className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                    Academic Year
-                  </label>
-                  <input
-                    type="text"
-                    value={subYear}
-                    onChange={(e) => setSubYear(e.target.value)}
-                    placeholder="e.g. 2026/2027"
-                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                    Gender
-                  </label>
-                  <select
-                    value={subGender}
-                    onChange={(e) => setSubGender(e.target.value)}
-                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSubmissionModalOpen(false)}
+                    className="w-full py-2.5 bg-[#1565D8] hover:bg-[#0D5BE1] text-white font-semibold text-xs rounded-full shadow-md shadow-blue-500/15 cursor-pointer transition-all active:scale-95 text-center block"
                   >
-                    <option value="M">Male (M)</option>
-                    <option value="F">Female (F)</option>
-                    <option value="Other">Other</option>
-                  </select>
+                    Close Window
+                  </button>
                 </div>
               </div>
+            ) : (
+              <form onSubmit={handleSubmitStudentProfile} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      value={subFirstName}
+                      onChange={(e) => setSubFirstName(e.target.value)}
+                      placeholder="e.g. Desire"
+                      className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      Surname
+                    </label>
+                    <input
+                      type="text"
+                      value={subSurname}
+                      onChange={(e) => setSubSurname(e.target.value)}
+                      placeholder="e.g. Kandodo"
+                      className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                      required
+                    />
+                  </div>
+                </div>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsSubmissionModalOpen(false)}
-                  className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-800 text-zinc-500 text-xs font-semibold rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-center"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 py-2.5 bg-[#1565D8] hover:bg-[#0D5BE1] disabled:opacity-50 text-white font-semibold text-xs rounded-full shadow-md shadow-blue-500/15 transition-colors cursor-pointer text-center"
-                >
-                  {isSubmitting ? "Submitting..." : "Submit Details"}
-                </button>
-              </div>
-            </form>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    University Email (@cunima.ac.mw)
+                  </label>
+                  <input
+                    type="email"
+                    value={subEmail}
+                    onChange={(e) => setSubEmail(e.target.value)}
+                    placeholder="e.g. desire.kandodo@cunima.ac.mw"
+                    className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      Registration ID
+                    </label>
+                    <input
+                      type="text"
+                      value={subRegNumber}
+                      onChange={(e) => setSubRegNumber(e.target.value)}
+                      placeholder="e.g. REG/CS/2026/011"
+                      className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      CUM Number
+                    </label>
+                    <input
+                      type="text"
+                      value={subCum}
+                      onChange={(e) => setSubCum(e.target.value)}
+                      placeholder="e.g. 3.75 or 76.5"
+                      className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    Program Course
+                  </label>
+                  <input
+                    type="text"
+                    value={subProgram}
+                    onChange={(e) => setSubProgram(e.target.value)}
+                    placeholder="e.g. BSc Computer Science"
+                    className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      Academic Year
+                    </label>
+                    <input
+                      type="text"
+                      value={subYear}
+                      onChange={(e) => setSubYear(e.target.value)}
+                      placeholder="e.g. 2026/2027"
+                      className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      Gender
+                    </label>
+                    <select
+                      value={subGender}
+                      onChange={(e) => setSubGender(e.target.value)}
+                      className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                    >
+                      <option value="M">Male (M)</option>
+                      <option value="F">Female (F)</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSubmissionModalOpen(false)}
+                    className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-800 text-zinc-500 text-xs font-semibold rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-center"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex-1 py-2.5 bg-[#1565D8] hover:bg-[#0D5BE1] disabled:opacity-50 text-white font-semibold text-xs rounded-full shadow-md shadow-blue-500/15 transition-colors cursor-pointer text-center"
+                  >
+                    {isSubmitting ? "Submitting..." : "Submit Details"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

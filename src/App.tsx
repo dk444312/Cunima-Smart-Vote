@@ -57,6 +57,7 @@ import {
   Candidate,
 } from "./types.ts";
 import { signInWithGoogle, logoutFirebase } from "./lib/firebase.ts";
+import { getUserAvatarUrl } from "./lib/avatar.ts";
 
 // Restructured modular dashboard views
 import AdminDashboard from "./components/admin/AdminDashboard.tsx";
@@ -1185,15 +1186,19 @@ export default function App() {
               <Menu className="w-5 h-5" />
             </button>
           )}
-          <div className="w-8 h-8 rounded-full bg-[#0B2D6B] flex items-center justify-center text-white shadow-md shadow-blue-500/20 flex-shrink-0">
-            <Vote className="w-4.5 h-4.5" />
+          <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 bg-transparent">
+            <img
+              src="/images/campus vote logo.png"
+              alt="CampusVote Logo"
+              className="w-full h-full object-contain"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <div>
             <h1 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-white">
               CampusVote
             </h1>
-            <p className="text-[10px] text-zinc-400 font-mono flex items-center gap-1">
-              <span>CampusVote</span>
+            <p className="text-[10px] text-zinc-400 font-mono flex items-center gap-1.5">
               <span
                 className={`inline-block w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
               />
@@ -1927,42 +1932,7 @@ export default function App() {
             {/* DESKTOP SIDEBAR */}
             <aside className="hidden md:flex md:w-64 bg-[#0B2D6B] text-white flex-col justify-between flex-shrink-0">
               <div className="p-4 space-y-4">
-                {/* BLUE USER / SYSTEM CARD ON TOP (MATCHING MOBILE NAV) */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0B2D6B] via-[#0f449e] to-[#1565D8] p-3.5 text-white shadow-md border border-white/15">
-                  <div className="absolute right-0 top-0 bottom-0 w-28 opacity-20 pointer-events-none flex items-center justify-center">
-                    <img
-                      src="/images/Home SVG.jpg"
-                      alt="Campus Accent"
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <div className="relative z-10 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 backdrop-blur-xs">
-                      <User className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-200 font-mono">
-                          {currentUser.role.replace("_", " ")}
-                        </span>
-                      </div>
-                      <h3 className="text-xs font-bold text-white truncate leading-tight mt-0.5">
-                        {currentUser.username}
-                      </h3>
-                      <p className="text-[9px] text-blue-200/80 truncate">
-                        {currentUser.role === "admin"
-                          ? "Full Governance Access"
-                          : currentUser.role === "club_manager"
-                            ? "Club Administrator"
-                            : "Verified Student Voter"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <span className="text-[10px] font-bold tracking-wider text-blue-300 uppercase font-mono block px-3 pt-1">
+                <span className="text-sm font-bold tracking-tight text-white block px-3 pt-2 pb-1 font-['-apple-system',BlinkMacSystemFont,'Segoe_UI',Roboto,Helvetica,Arial,sans-serif]">
                   {currentUser.role === "admin"
                     ? "Admin Workspace"
                     : currentUser.role === "club_manager"
@@ -2274,6 +2244,19 @@ export default function App() {
                         </div>
                       </button>
                       <button
+                        onClick={() => setActiveMenu("security")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "security"
+                            ? "bg-white/20 text-white font-bold"
+                            : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Lock className="w-4 h-4" />
+                          <span>Security</span>
+                        </div>
+                      </button>
+                      <button
                         onClick={() => setActiveMenu("profile")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
                           activeMenu === "profile"
@@ -2289,30 +2272,6 @@ export default function App() {
                     </>
                   )}
                 </nav>
-
-                {/* DECORATIVE CAMPAIGN SPOTLIGHT MINI-CARD */}
-                <div className="mt-5 p-3 bg-gradient-to-br from-blue-900/60 via-blue-950/80 to-[#0A2558] border border-blue-400/20 rounded-2xl relative overflow-hidden shadow-inner">
-                  <div className="flex items-center justify-between gap-2 relative z-10">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-200 font-mono">
-                          CUNIMA Portal
-                        </span>
-                      </div>
-                      <p className="text-[11px] font-bold text-white leading-tight">Digital Democracy</p>
-                      <p className="text-[9px] text-blue-200/80 leading-tight">Verifiable Student Elections</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-blue-800/50 p-1 flex-shrink-0 flex items-center justify-center border border-blue-400/30">
-                      <img
-                        src="/images/election icon.png"
-                        alt="Elections"
-                        className="w-full h-full object-contain drop-shadow"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* DESKTOP SIDEBAR FOOTER */}
@@ -2529,6 +2488,18 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => setActiveMenu("security")}
+                className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                  activeMenu === "security"
+                    ? "text-[#0B2D6B] dark:text-blue-400 font-bold bg-blue-50/80 dark:bg-blue-950/50"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                }`}
+              >
+                <Lock className="w-5 h-5" />
+                <span className="text-[10px] tracking-tight">Security</span>
+              </button>
+
+              <button
                 onClick={() => setActiveMenu("profile")}
                 className={`flex-1 min-h-[46px] py-1 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
                   activeMenu === "profile"
@@ -2714,8 +2685,22 @@ export default function App() {
                 </div>
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 backdrop-blur-xs">
-                      <User className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/30 flex items-center justify-center text-white shadow-inner flex-shrink-0 bg-white/10 backdrop-blur-xs">
+                      <img
+                        src={getUserAvatarUrl(
+                          students.find((s) => {
+                            const cleanU = currentUser.username.trim().toLowerCase();
+                            return (
+                              s.registration_number.trim().toLowerCase() === cleanU ||
+                              (s.email && s.email.trim().toLowerCase() === cleanU) ||
+                              `${s.first_name} ${s.surname}`.trim().toLowerCase() === cleanU
+                            );
+                          })?.gender
+                        )}
+                        alt="User Profile"
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-white leading-tight">
@@ -3004,6 +2989,21 @@ export default function App() {
                     >
                       <PieChart className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>Results</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveMenu("security");
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-left transition-all ${
+                        activeMenu === "security"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-[#0B2D6B] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Lock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Security</span>
                     </button>
 
                     <button

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { StudentRow } from "../../types.ts";
 import { dbService } from "../../lib/supabase.ts";
+import { getUserAvatarUrl } from "../../lib/avatar.ts";
 
 interface StudentsManagerProps {
   students: StudentRow[];
@@ -965,8 +966,18 @@ export default function StudentsManager({
                     className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 text-zinc-800 dark:text-zinc-200 transition-colors"
                   >
                     <td className="px-5 py-3.5">
-                      <div className="font-semibold text-zinc-950 dark:text-zinc-50">
-                        {student.surname}, {student.first_name}
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 flex-shrink-0 shadow-xs">
+                          <img
+                            src={getUserAvatarUrl(student.gender)}
+                            alt={`${student.first_name} photo`}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                        <div className="font-semibold text-zinc-950 dark:text-zinc-50">
+                          {student.surname}, {student.first_name}
+                        </div>
                       </div>
                     </td>
 
