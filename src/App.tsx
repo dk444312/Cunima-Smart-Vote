@@ -74,6 +74,8 @@ export default function App() {
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [showCredentialsForm, setShowCredentialsForm] = useState(false);
+  const [showCredentialsWarningModal, setShowCredentialsWarningModal] = useState(false);
 
   // Database State Mirrors
   const [elections, setElections] = useState<ElectionRow[]>([]);
@@ -1174,9 +1176,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#fafafa] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200 font-sans antialiased flex flex-col">
       {/* GLOBAL BANNER */}
-      <header className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 py-3 px-4 sm:px-6 sticky top-0 z-40 shadow-sm flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {currentUser && (
+      {currentUser && (
+        <header className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 py-3 px-4 sm:px-6 sticky top-0 z-40 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setIsMobileDrawerOpen(true)}
               className="md:hidden p-2 -ml-1 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
@@ -1185,56 +1187,54 @@ export default function App() {
             >
               <Menu className="w-5 h-5" />
             </button>
-          )}
-          <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 bg-transparent">
-            <img
-              src="/images/campus vote logo.png"
-              alt="CampusVote Logo"
-              className="w-full h-full object-contain"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div>
-            <h1 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-white">
-              CampusVote
-            </h1>
-            <p className="text-[10px] text-zinc-400 font-mono flex items-center gap-1.5">
-              <span
-                className={`inline-block w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
+            <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 bg-transparent">
+              <img
+                src="/images/campus vote logo.png"
+                alt="CampusVote Logo"
+                className="w-full h-full object-contain"
+                referrerPolicy="no-referrer"
               />
-              <span className="hidden xs:inline">
-                {isSupabaseConfigured ? "Online Postgres" : "Local Mock Storage"}
-              </span>
-            </p>
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-white">
+                CampusVote
+              </h1>
+              <p className="text-[10px] text-zinc-400 font-mono flex items-center gap-1.5">
+                <span
+                  className={`inline-block w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
+                />
+                <span className="hidden xs:inline">
+                  {isSupabaseConfigured ? "Online Postgres" : "Local Mock Storage"}
+                </span>
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            onClick={refreshDatabaseState}
-            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors cursor-pointer"
-            title="Refresh tables state"
-            aria-label="Refresh tables state"
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
-            />
-          </button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={refreshDatabaseState}
+              className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors cursor-pointer"
+              title="Refresh tables state"
+              aria-label="Refresh tables state"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+              />
+            </button>
 
-          <button
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors cursor-pointer"
-            title="Toggle theme appearance"
-            aria-label="Toggle theme appearance"
-          >
-            {isDarkMode ? (
-              <Sun className="w-4 h-4" />
-            ) : (
-              <Moon className="w-4 h-4" />
-            )}
-          </button>
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors cursor-pointer"
+              title="Toggle theme appearance"
+              aria-label="Toggle theme appearance"
+            >
+              {isDarkMode ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </button>
 
-          {currentUser && (
             <button
               onClick={handleLogout}
               className="p-2 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg text-red-500 transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
@@ -1244,9 +1244,9 @@ export default function App() {
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Logout</span>
             </button>
-          )}
-        </div>
-      </header>
+          </div>
+        </header>
+      )}
 
       {/* WORKSPACE VIEW CONTENT */}
       <div className="flex-1 flex flex-col">
@@ -1294,10 +1294,10 @@ export default function App() {
                 id="student_registration_form"
               >
                 <div>
-                  <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                  <h3 className="text-lg font-bold text-zinc-950 dark:text-zinc-50">
                     CUNIMA Student Registration
                   </h3>
-                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  <p className="text-xs text-zinc-950 dark:text-zinc-200 mt-1.5 leading-relaxed font-semibold">
                     {pendingGoogleUser.customMessage ||
                       (pendingGoogleUser.source === "google"
                         ? "Your Google account is authenticated, but your student record is not yet in the voter database. Please submit your registration details to the administrator."
@@ -1305,7 +1305,7 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-2xl border border-blue-100 dark:border-blue-900/30 text-[11px] text-blue-800 dark:text-blue-300 font-mono flex items-center justify-between gap-2">
+                <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-2xl border border-blue-100 dark:border-blue-900/30 text-[11px] text-blue-950 dark:text-blue-100 font-mono flex items-center justify-between gap-2">
                   <span className="truncate">
                     Account:{" "}
                     <strong className="text-blue-950 dark:text-blue-100">
@@ -1322,7 +1322,7 @@ export default function App() {
                 <form onSubmit={handleRegisterSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      <label className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 uppercase tracking-wider block">
                         First Name
                       </label>
                       <input
@@ -1330,12 +1330,12 @@ export default function App() {
                         value={regFirstName}
                         onChange={(e) => setRegFirstName(e.target.value)}
                         placeholder="e.g. Desire"
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2.5 bg-transparent border border-zinc-400 dark:border-zinc-600 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-950 dark:text-zinc-50 font-medium"
                         required
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      <label className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 uppercase tracking-wider block">
                         Surname
                       </label>
                       <input
@@ -1343,14 +1343,14 @@ export default function App() {
                         value={regSurname}
                         onChange={(e) => setRegSurname(e.target.value)}
                         placeholder="e.g. Kandodo"
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2.5 bg-transparent border border-zinc-400 dark:border-zinc-600 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-950 dark:text-zinc-50 font-medium"
                         required
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    <label className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 uppercase tracking-wider block">
                       University Email (@cunima.ac.mw)
                     </label>
                     <input
@@ -1358,14 +1358,14 @@ export default function App() {
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
                       placeholder="e.g. desire.kandodo@cunima.ac.mw"
-                      className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                      className="w-full px-3.5 py-2.5 bg-transparent border border-zinc-400 dark:border-zinc-600 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-950 dark:text-zinc-50 font-medium"
                       required
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      <label className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 uppercase tracking-wider block">
                         Registration ID
                       </label>
                       <input
@@ -1373,12 +1373,12 @@ export default function App() {
                         value={regNumber}
                         onChange={(e) => setRegNumber(e.target.value)}
                         placeholder="e.g. REG/CS/2026/011"
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2.5 bg-transparent border border-zinc-400 dark:border-zinc-600 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-950 dark:text-zinc-50 font-medium"
                         required
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      <label className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 uppercase tracking-wider block">
                         CUM Number
                       </label>
                       <input
@@ -1386,14 +1386,14 @@ export default function App() {
                         value={regCum}
                         onChange={(e) => setRegCum(e.target.value)}
                         placeholder="e.g. 3.75 or 76.5"
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2.5 bg-transparent border border-zinc-400 dark:border-zinc-600 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-950 dark:text-zinc-50 font-medium"
                         required
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    <label className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 uppercase tracking-wider block">
                       Program Course
                     </label>
                     <input
@@ -1401,14 +1401,14 @@ export default function App() {
                       value={regProgram}
                       onChange={(e) => setRegProgram(e.target.value)}
                       placeholder="e.g. BSc Computer Science"
-                      className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                      className="w-full px-3.5 py-2.5 bg-transparent border border-zinc-400 dark:border-zinc-600 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-950 dark:text-zinc-50 font-medium"
                       required
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      <label className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 uppercase tracking-wider block">
                         Academic Year
                       </label>
                       <input
@@ -1416,18 +1416,18 @@ export default function App() {
                         value={regYear}
                         onChange={(e) => setRegYear(e.target.value)}
                         placeholder="e.g. 2026/2027"
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2.5 bg-transparent border border-zinc-400 dark:border-zinc-600 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-950 dark:text-zinc-50 font-medium"
                         required
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      <label className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 uppercase tracking-wider block">
                         Gender
                       </label>
                       <select
                         value={regGender}
                         onChange={(e) => setRegGender(e.target.value)}
-                        className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                        className="w-full px-3 py-2.5 bg-transparent border border-zinc-400 dark:border-zinc-600 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-950 dark:text-zinc-50 font-medium"
                       >
                         <option value="M">Male (M)</option>
                         <option value="F">Female (F)</option>
@@ -1685,21 +1685,29 @@ export default function App() {
                 </form>
               </div>
             ) : isSearchingProfile ? (
-              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm space-y-6 text-center">
+              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm space-y-6 text-center animate-fadeIn">
                 <div className="py-6 flex flex-col items-center justify-center space-y-4">
-                  <div className="relative w-20 h-20">
-                    <div className="absolute inset-0 rounded-full border-4 border-blue-100 dark:border-blue-900/30 animate-pulse" />
-                    <div className="absolute inset-0 rounded-full border-4 border-t-blue-600 dark:border-t-blue-400 animate-spin" />
-                    <div className="absolute inset-4 bg-blue-50 dark:bg-blue-950/40 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400">
-                      <UserCheck className="w-6 h-6 animate-pulse" />
-                    </div>
+                  <div className="w-24 h-24 overflow-hidden rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 shadow-md flex items-center justify-center bg-white mb-2 animate-[pulse_1.5s_infinite]">
+                    <img
+                      src="/images/Cunima logo.jpg"
+                      alt="CUNIMA Logo"
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  
+                  <h3 className="text-sm font-black tracking-wider text-zinc-900 dark:text-zinc-50 uppercase font-sans">
+                    CUNIMA STUDENT VERIFICATION
+                  </h3>
+
+                  <div className="flex items-center gap-1.5 justify-center py-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#1565D8] dark:bg-blue-400 animate-bounce [animation-delay:-0.3s]" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#1565D8] dark:bg-blue-400 animate-bounce [animation-delay:-0.15s]" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#1565D8] dark:bg-blue-400 animate-bounce" />
                   </div>
 
                   <div className="space-y-1">
-                    <h3 className="text-lg font-semibold text-[#1a73e8] dark:text-blue-400">
-                      Matching Profile...
-                    </h3>
-                    <p className="text-xs text-zinc-400">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
                       Authenticated as{" "}
                       <strong className="text-zinc-700 dark:text-zinc-300">
                         {currentUserDisplay}
@@ -1726,46 +1734,29 @@ export default function App() {
               </div>
             ) : (
               <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-                <div className="text-center space-y-2">
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-2xl flex items-center justify-center text-blue-600 mx-auto">
-                    <ShieldCheck className="w-6 h-6" />
+                <div className="text-center space-y-3">
+                  <div className="w-20 h-20 mx-auto overflow-hidden rounded-2xl border border-zinc-200/60 dark:border-zinc-800 shadow-sm flex items-center justify-center bg-transparent">
+                    <img
+                      src="/images/Cunima logo.jpg"
+                      alt="CUNIMA Logo"
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
                   </div>
-                  <h2 className="text-2xl font-normal text-zinc-950 dark:text-zinc-50">
-                    CUNIMA Voter Portal
+                  <h2 className="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 uppercase">
+                    CUNIMA STUDENT VOTER PORTAL
                   </h2>
-                  <p className="text-xs text-zinc-400 max-w-xs mx-auto">
-                    Socrates campus elections portal. Sign in with your official
-                    university account to access active ballots.
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 max-w-md mx-auto leading-relaxed">
+                    welcome to student voting platform managed by cunima
                   </p>
                 </div>
 
-                {/* GOOGLE SIGN IN - PRIMARY ENTRANCE */}
+                 {/* GOOGLE SIGN IN - PRIMARY ENTRANCE */}
                 <div className="space-y-4">
                   {loginError && (
                     <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-xs font-medium flex items-center gap-2 border border-red-200 dark:border-red-900/50">
                       <ShieldAlert className="w-4 h-4 flex-shrink-0" />
                       <span>{loginError}</span>
-                    </div>
-                  )}
-
-                  {unregisteredUsernamePrompt && (
-                    <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
-                      <div className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
-                        Account is not connected to the student registry.
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openSubmissionForm(
-                            unregisteredUsernamePrompt,
-                            "credentials",
-                            `Account "${unregisteredUsernamePrompt}" is not connected to a student record. Submit your details for verification.`,
-                          )
-                        }
-                        className="px-3.5 py-1.5 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-xs rounded-full whitespace-nowrap cursor-pointer transition-all active:scale-95 text-center"
-                      >
-                        Submit Student Details →
-                      </button>
                     </div>
                   )}
 
@@ -1800,128 +1791,6 @@ export default function App() {
                     </svg>
                     <span>Sign In with @cunima.ac.mw Google</span>
                   </button>
-                </div>
-
-                <div className="relative flex items-center justify-center my-4">
-                  <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
-                  <span className="bg-white dark:bg-zinc-900 px-3 text-[10px] uppercase tracking-wider text-zinc-400 font-bold absolute font-mono">
-                    or authenticate with credentials
-                  </span>
-                </div>
-
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-zinc-500">
-                      Username
-                    </label>
-                    <input
-                      type="text"
-                      value={usernameInput}
-                      onChange={(e) => setUsernameInput(e.target.value)}
-                      placeholder="Enter your credential username"
-                      className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <label className="text-xs font-semibold text-zinc-500">
-                        Password
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setIsPasswordVisible(!isPasswordVisible)}
-                        className="text-[11px] text-zinc-400 hover:text-zinc-600 cursor-pointer"
-                      >
-                        {isPasswordVisible ? "Hide" : "Show"}
-                      </button>
-                    </div>
-                    <input
-                      type={isPasswordVisible ? "text" : "password"}
-                      value={passwordInput}
-                      onChange={(e) => setPasswordInput(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full px-4 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-sm text-zinc-950 dark:text-zinc-50"
-                      required
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full py-2.5 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 font-semibold text-sm rounded-full transition-all active:scale-95 cursor-pointer"
-                  >
-                    {isLoading
-                      ? "Validating Session..."
-                      : "Verify Username & Password"}
-                  </button>
-
-                  <div className="text-center pt-1">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openSubmissionForm(
-                          usernameInput,
-                          "manual",
-                          "Submit your student registration details to the administrator for verification.",
-                        )
-                      }
-                      className="text-xs text-[#1565D8] dark:text-blue-400 hover:underline font-medium cursor-pointer"
-                    >
-                      Not in the database yet? Submit student details
-                    </button>
-                  </div>
-                </form>
-
-                {/* SANDBOX PREMADE CREDS DECK */}
-                <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block text-center font-mono">
-                    Sandbox Testing Credentials
-                  </span>
-
-                  <div className="grid grid-cols-3 gap-2 text-[11px] font-semibold text-zinc-500">
-                    <button
-                      onClick={() => {
-                        setUsernameInput("admin");
-                        setPasswordInput("admin");
-                      }}
-                      className="p-2 bg-zinc-50 dark:bg-zinc-800/40 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-center border border-zinc-200/60 dark:border-zinc-800/60 transition-all cursor-pointer"
-                    >
-                      <span className="block text-zinc-800 dark:text-zinc-200 font-bold">
-                        Admin Panel
-                      </span>
-                      <span className="text-[10px] text-zinc-400 font-mono">
-                        admin / admin
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setUsernameInput("manager");
-                        setPasswordInput("manager");
-                      }}
-                      className="p-2 bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/50 dark:hover:bg-purple-900/20 rounded-full text-center border border-purple-200/60 dark:border-purple-900/60 transition-all cursor-pointer text-purple-700 dark:text-purple-300"
-                    >
-                      <span className="block font-bold">Club Manager</span>
-                      <span className="text-[10px] text-purple-400 font-mono">
-                        manager / manager
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setUsernameInput("voter");
-                        setPasswordInput("voter");
-                      }}
-                      className="p-2 bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-100/50 dark:hover:bg-blue-900/20 rounded-full text-center border border-blue-200/60 dark:border-blue-900/60 transition-all cursor-pointer text-blue-700 dark:text-blue-300"
-                    >
-                      <span className="block font-bold">Voter Card</span>
-                      <span className="text-[10px] text-blue-400 font-mono">
-                        voter / voter
-                      </span>
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
@@ -2289,13 +2158,6 @@ export default function App() {
 
             {/* MAIN PORTLET CONTAINER */}
             <main className="flex-1 p-4 sm:p-6 md:p-8 pb-28 md:pb-8 max-w-6xl mx-auto w-full overflow-y-auto min-w-0">
-              {isLoading && (
-                <div className="mb-4 p-3 rounded-full bg-blue-50/50 dark:bg-blue-950/10 text-blue-600 dark:text-blue-400 text-xs font-mono flex items-center gap-2 border border-blue-100 dark:border-blue-900/20">
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Syncing state with servers...</span>
-                </div>
-              )}
-
               {currentUser.role === "admin" ? (
                 /* ================== ROUTED ADMIN PORTAL ================== */
                 <AdminDashboard
@@ -3070,6 +2932,68 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* GLOBAL FULL SCREEN LOADER */}
+      {isLoading && (
+        <div className="fixed inset-0 z-[100] bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 select-none cursor-wait text-center">
+          <div className="relative w-36 h-36 flex items-center justify-center animate-[pulse_1.5s_infinite] mb-2">
+            <img
+              src="/images/campusvote loader.png"
+              alt="Loading"
+              className="w-full h-full object-contain"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <div className="mt-4 w-32 h-1 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden relative">
+            <div className="absolute top-0 bottom-0 left-0 bg-[#1565D8] rounded-full animate-[pulse_1s_infinite]" style={{ width: '100%' }}></div>
+          </div>
+        </div>
+      )}
+
+      {/* CREDENTIALS LOGIN SECURITY WARNING MODAL */}
+      {showCredentialsWarningModal && (
+        <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl space-y-5 text-center">
+            <div className="w-full h-40 overflow-hidden rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50 flex items-center justify-center">
+              <img
+                src="/images/security.jpg"
+                alt="Security"
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50">
+                Security Verification
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                u must login with google first to use this feature
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCredentialsWarningModal(false);
+                  setShowCredentialsForm(true);
+                }}
+                className="w-full py-2.5 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer text-center"
+              >
+                Proceed to Login with Username & Password
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCredentialsWarningModal(false)}
+                className="w-full py-2.5 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-xs rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-center"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FLOATING TOAST FEEDBACK */}
       <AnimatePresence>

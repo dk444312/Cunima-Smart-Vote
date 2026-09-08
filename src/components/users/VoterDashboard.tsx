@@ -312,14 +312,14 @@ export default function VoterDashboard({
           <div className="space-y-4 bg-transparent p-0">
             <div>
               {!linkedStudent && (
-                <div className="mb-2">
+                <div className="mb-3">
                   <button
                     type="button"
                     onClick={() => setIsSubmissionModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/40 hover:bg-blue-100 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-black bg-amber-100 dark:bg-amber-950/40 text-zinc-950 dark:text-zinc-50 border border-amber-300 dark:border-amber-900/50 hover:bg-amber-200 dark:hover:bg-amber-900/20 transition-all cursor-pointer shadow-xs active:scale-95"
                   >
-                    <BadgeAlert className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Unlinked Account • Click to Submit Student Registration</span>
+                    <BadgeAlert className="w-4 h-4 text-amber-600 animate-pulse" />
+                    <span>Not in the database yet? Submit student details</span>
                   </button>
                 </div>
               )}
@@ -1256,22 +1256,22 @@ export default function VoterDashboard({
                 </div>
               ) : (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col justify-center items-center text-center space-y-4">
-                  <BadgeAlert className="w-12 h-12 text-amber-500" />
+                  <BadgeAlert className="w-12 h-12 text-amber-500 animate-pulse" />
                   <div>
-                    <h3 className="font-semibold text-zinc-800 dark:text-zinc-200 text-sm">
-                      No Student Record Linked
+                    <h3 className="font-extrabold text-zinc-950 dark:text-zinc-50 text-base uppercase">
+                      Not in the database yet?
                     </h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs mt-1 leading-relaxed">
-                      Your voter credentials are active, but no verified student card is connected to your account yet.
+                    <p className="text-xs text-zinc-950 dark:text-zinc-200 max-w-xs mt-1 leading-relaxed font-semibold">
+                      Your voter credentials are active, but your official student card is not yet connected to your account.
                     </p>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => setIsSubmissionModalOpen(true)}
-                    className="px-4 py-2.5 bg-[#1565D8] hover:bg-[#0D5BE1] text-white font-semibold text-xs rounded-full shadow-md shadow-blue-500/15 cursor-pointer transition-all active:scale-95"
+                    className="px-5 py-3 bg-[#1565D8] hover:bg-blue-900 text-white font-black text-xs rounded-full shadow-md shadow-blue-500/15 cursor-pointer transition-all active:scale-95 uppercase tracking-wide"
                   >
-                    Submit Student Registration Details →
+                    Submit student details
                   </button>
                 </div>
               )}
