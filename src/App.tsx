@@ -69,7 +69,14 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Authentication State
-  const [currentUser, setCurrentUser] = useState<LoggedInUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<LoggedInUser | null>(() => {
+    try {
+      const saved = localStorage.getItem("g_election_active_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [usernameInput, setUsernameInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -91,8 +98,23 @@ export default function App() {
     Record<string, UpdateCommentRow[]>
   >({});
   const [students, setStudents] = useState<StudentRow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Only true during initial boot before user login
+  const [isLoading, setIsLoading] = useState(() => {
+    try {
+      const saved = localStorage.getItem("g_election_active_user");
+      return !saved;
+    } catch {
+      return true;
+    }
+  });
   const [showOctopasSplash, setShowOctopasSplash] = useState(false);
+
+  // Guarded loader - strictly only allows loader before user login
+  const setAppLoading = (val: boolean) => {
+    if (!currentUser) {
+      setIsLoading(val);
+    }
+  };
 
   // Student Registration Form States (Google or Username/Password Auth)
   const [pendingGoogleUser, setPendingGoogleUser] = useState<{
@@ -181,7 +203,9 @@ export default function App() {
   // Sync state with database
   const refreshDatabaseState = async () => {
     try {
-      setIsLoading(true);
+      if (!currentUser) {
+        setIsLoading(true);
+      }
       const [
         allElections,
         allVoters,
@@ -248,14 +272,9 @@ export default function App() {
         localStorage.setItem("has_seen_octopas_splash", "true");
       }
       await refreshDatabaseState();
+      setIsLoading(false);
     };
     init();
-
-    // Recover logged-in user if saved locally
-    const saved = localStorage.getItem("g_election_active_user");
-    if (saved) {
-      setCurrentUser(JSON.parse(saved));
-    }
   }, []);
 
   useEffect(() => {
@@ -824,7 +843,7 @@ export default function App() {
     const legacyCandidates = validPositions.flatMap((p) => p.candidates);
 
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.insertElection(
         newElectionTitle.trim(),
         newElectionDesc.trim(),
@@ -856,7 +875,7 @@ export default function App() {
     } catch (err: any) {
       showToast(`SQL INSERT FAIL: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
@@ -865,33 +884,33 @@ export default function App() {
     status: "draft" | "active" | "completed",
   ) => {
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.updateElection(id, { status });
       await refreshDatabaseState();
       showToast(`SQL UPDATE SUCCESS: Election status updated to "${status}".`);
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
   const handleDeleteElection = async (id: string) => {
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.deleteElection(id);
       await refreshDatabaseState();
       showToast("SQL DELETE SUCCESS: Election sheet deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
   const simulateVotes = async (electionId: string) => {
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       const election = elections.find((e) => e.id === electionId);
       if (!election) return;
 
@@ -938,7 +957,7 @@ export default function App() {
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
@@ -947,7 +966,7 @@ export default function App() {
     if (!newVoterUsername.trim()) return;
 
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.insertVoter(
         newVoterUsername.trim(),
         newVoterPassword.trim() || "Pass123",
@@ -963,14 +982,14 @@ export default function App() {
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
   const toggleVoterRole = async (v: VoterRow) => {
     const nextRole = v.role === "club_manager" ? "voter" : "club_manager";
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.updateVoter(v.id, { role: nextRole });
       await refreshDatabaseState();
       showToast(
@@ -979,13 +998,13 @@ export default function App() {
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
   const toggleBlockVoter = async (v: VoterRow) => {
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.updateVoter(v.id, { is_blocked: !v.is_blocked });
       await refreshDatabaseState();
       showToast(
@@ -994,26 +1013,26 @@ export default function App() {
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
   const handleDeleteVoter = async (id: string) => {
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.deleteVoter(id);
       await refreshDatabaseState();
       showToast("SQL DELETE SUCCESS: Account credentials deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
   const togglePublishResults = async (id: string, published: boolean) => {
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.updateElection(id, { published });
       await refreshDatabaseState();
       showToast(
@@ -1022,7 +1041,7 @@ export default function App() {
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
@@ -1035,7 +1054,7 @@ export default function App() {
     }
 
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.insertClub(
         newClubName.trim(),
         newClubDesc.trim() || "No description provided.",
@@ -1052,20 +1071,20 @@ export default function App() {
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
   const handleDeleteClub = async (id: string) => {
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.deleteClub(id);
       await refreshDatabaseState();
       showToast("SQL DELETE SUCCESS: Club page deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
@@ -1078,14 +1097,14 @@ export default function App() {
       : [...existingIds, voterId];
 
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.setClubMembers(clubId, updatedIds);
       showToast("SQL TRANSACTION SUCCESS: Club roster updated.");
       await refreshDatabaseState();
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
@@ -1095,7 +1114,7 @@ export default function App() {
     if (!newUpdateContent.trim() && !mediaUrl) return;
 
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.insertUpdate(
         newUpdateContent.trim(),
         "Administrator",
@@ -1107,20 +1126,20 @@ export default function App() {
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
   const handleDeleteUpdate = async (id: string) => {
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.deleteUpdate(id);
       await refreshDatabaseState();
       showToast("SQL DELETE SUCCESS: Broadcast update deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
@@ -1169,7 +1188,7 @@ export default function App() {
     }
 
     try {
-      setIsLoading(true);
+      setAppLoading(true);
       await dbService.clearAllData();
       await refreshDatabaseState();
       showToast(
@@ -1178,7 +1197,7 @@ export default function App() {
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
@@ -2303,7 +2322,7 @@ export default function App() {
                   truncateDatabase={truncateDatabase}
                   refreshDatabaseState={refreshDatabaseState}
                   showToast={showToast}
-                  setIsLoading={setIsLoading}
+                  setIsLoading={setAppLoading}
                 />
               ) : currentUser.role === "club_manager" ? (
                 /* ================== ROUTED CLUB MANAGER PORTAL ================== */
@@ -2324,8 +2343,8 @@ export default function App() {
                   handlePostComment={handlePostComment}
                   refreshDatabaseState={refreshDatabaseState}
                   showToast={showToast}
-                  isLoading={isLoading}
-                  setIsLoading={setIsLoading}
+                  isLoading={false}
+                  setIsLoading={setAppLoading}
                   activeTab={activeMenu}
                 />
               ) : (
@@ -2347,7 +2366,7 @@ export default function App() {
                   handlePostComment={handlePostComment}
                   refreshDatabaseState={refreshDatabaseState}
                   showToast={showToast}
-                  setIsLoading={setIsLoading}
+                  setIsLoading={setAppLoading}
                   activeTab={activeMenu}
                   onNavigate={(tab) => setActiveMenu(tab)}
                 />
@@ -3005,8 +3024,8 @@ export default function App() {
         </div>
       )}
 
-      {/* GLOBAL FULL SCREEN LOADER */}
-      {isLoading && !showOctopasSplash && (
+      {/* GLOBAL FULL SCREEN LOADER - STRICTLY ONLY BEFORE USER LOGIN */}
+      {!currentUser && isLoading && !showOctopasSplash && (
         <div className="fixed inset-0 z-[100] bg-white dark:bg-zinc-950 backdrop-blur-md flex flex-col items-center justify-center p-6 select-none cursor-wait text-center">
           <div className="relative w-44 h-44 flex items-center justify-center animate-[pulse_1.5s_infinite] mb-2">
             <img
