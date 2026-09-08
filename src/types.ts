@@ -3,12 +3,27 @@
  * SPDX-License-Identifier: Apache-2.5
  */
 
+export interface Candidate {
+  id: string;
+  name: string;
+  photo_url?: string;
+  manifesto?: string;
+}
+
+export interface Position {
+  id: string;
+  title: string;
+  description?: string;
+  candidates: Candidate[];
+}
+
 export interface ElectionRow {
   id: string;
   title: string;
   description: string;
   status: "draft" | "active" | "completed";
-  candidates: any[]; // JSON representation or parsed array of string candidates or objects {name, photo_url}
+  candidates: any[]; // Legacy fallback or flat representation
+  positions?: Position[]; // Structured positions with candidates and photos
   created_at: string;
   published: boolean;
   published_at?: string;
@@ -29,7 +44,9 @@ export interface VoteRow {
   id: string;
   voter_id: string; // Foreign key references VoterRow.id
   election_id: string; // Foreign key references ElectionRow.id
-  candidate: string;
+  position_id?: string; // Foreign key or identifier for election position
+  candidate: string; // Name of candidate voted for
+  candidate_id?: string; // ID of candidate voted for
   created_at: string;
 }
 

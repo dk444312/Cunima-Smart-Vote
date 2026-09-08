@@ -8,6 +8,8 @@ import {
   Sparkles,
   User,
   BadgeAlert,
+  Award,
+  Lock,
 } from "lucide-react";
 import {
   LoggedInUser,
@@ -19,8 +21,10 @@ import {
   UpdateCommentRow,
   VoterRow,
   StudentRow,
+  Position,
+  Candidate,
 } from "../../types.ts";
-import { dbService } from "../../lib/supabase.ts";
+import { dbService, getElectionPositions } from "../../lib/supabase.ts";
 import UpdatesFeed from "../shared/UpdatesFeed.tsx";
 
 interface VoterDashboardProps {
@@ -43,6 +47,8 @@ interface VoterDashboardProps {
   showToast: (msg: string) => void;
   setIsLoading: (val: boolean) => void;
   activeTab: string;
+  onNavigate?: (tab: string) => void;
+  onRequireLogin?: () => void;
 }
 
 export default function VoterDashboard({
@@ -63,9 +69,11 @@ export default function VoterDashboard({
   showToast,
   setIsLoading,
   activeTab,
+  onNavigate,
 }: VoterDashboardProps) {
+  // Keyed by `${electionId}_${positionId}` -> { candidateName, candidateId }
   const [selectedCandidates, setSelectedCandidates] = useState<
-    Record<string, string>
+    Record<string, { candidateName: string; candidateId?: string }>
   >({});
 
   // Profile fields state
@@ -78,16 +86,80 @@ export default function VoterDashboard({
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
 
-  const handleCastVote = async (electionId: string) => {
-    const chosenCandidate = selectedCandidates[electionId];
-    if (!chosenCandidate) return;
+  // Unlinked student submission modal state
+  const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [subFirstName, setSubFirstName] = useState("");
+  const [subSurname, setSubSurname] = useState("");
+  const [subRegNumber, setSubRegNumber] = useState(
+    currentUser.username.includes("@") ? "" : currentUser.username,
+  );
+  const [subEmail, setSubEmail] = useState(
+    currentUser.username.includes("@") ? currentUser.username : "",
+  );
+  const [subProgram, setSubProgram] = useState("");
+  const [subYear, setSubYear] = useState("");
+  const [subCum, setSubCum] = useState("");
+  const [subGender, setSubGender] = useState("M");
+
+  const handleSubmitStudentProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (
+      !subFirstName ||
+      !subSurname ||
+      !subRegNumber ||
+      !subProgram ||
+      !subYear ||
+      !subCum
+    ) {
+      showToast("Please fill in all student profile fields.");
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      setIsLoading(true);
+      await dbService.insertStudent({
+        first_name: subFirstName.trim(),
+        surname: subSurname.trim(),
+        registration_number: subRegNumber.trim(),
+        program_name: subProgram.trim(),
+        academic_year: subYear.trim(),
+        cum_number: subCum.trim(),
+        gender: subGender.trim(),
+        email: (subEmail || currentUser.username).trim().toLowerCase(),
+        status: "pending",
+      });
+      await refreshDatabaseState();
+      setIsSubmissionModalOpen(false);
+      showToast("Student profile submitted for administrator approval.");
+    } catch (err: any) {
+      showToast(`Error: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+      setIsLoading(false);
+    }
+  };
+
+  const handleCastVote = async (
+    electionId: string,
+    positionId: string,
+    candidateName: string,
+    candidateId?: string,
+  ) => {
+    if (!candidateName) return;
 
     try {
       setIsLoading(true);
-      await dbService.insertVote(currentUser.id, electionId, chosenCandidate);
+      await dbService.insertVote(
+        currentUser.id,
+        electionId,
+        candidateName,
+        positionId,
+        candidateId,
+      );
       await refreshDatabaseState();
       showToast(
-        `BALLOT TRANSACTION SUCCESS: Your vote for "${chosenCandidate}" has been successfully cast.`,
+        `BALLOT SUCCESS: Your vote for "${candidateName}" has been securely recorded in the database.`,
       );
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message || "Could not cast your vote."}`);
@@ -162,154 +234,363 @@ export default function VoterDashboard({
 
   return (
     <div className="space-y-6">
-      {/* Voter Header Panel */}
-      <div className="flex flex-col gap-4 items-start bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-        <div>
-          <span className="text-xs font-bold tracking-wider text-[#0B1E40] dark:text-blue-400 uppercase font-mono">
-            Official Voter Ballot Portal
-          </span>
-          <h2 className="text-2xl font-normal text-zinc-900 dark:text-zinc-50 mt-1">
-            Welcome back, {currentUser.username}
-          </h2>
-        </div>
-      </div>
+      {/* ================== HOME TAB (POSTS & UPDATES FOCUS WITH VOTE / RESULTS CTAS) ================== */}
+      {activeTab === "home" && (() => {
+        const normUser = currentUser.username.trim().toLowerCase();
+        const linkedStudent = students.find((s) => {
+          const sEmail = s.email ? s.email.trim().toLowerCase() : "";
+          const sReg = s.registration_number ? s.registration_number.trim().toLowerCase() : "";
+          const sCum = s.cum_number ? s.cum_number.trim().toLowerCase() : "";
+          if (sEmail && sEmail === normUser) return true;
+          if (sReg && sReg === normUser) return true;
+          if (sCum && sCum === normUser) return true;
+          if (sEmail && normUser.includes("@") && sEmail.split("@")[0] === normUser.split("@")[0]) return true;
+          return false;
+        });
 
-      {/* TAB CONTENT */}
-      {activeTab === "ballot" && (
+        return (
         <div className="space-y-6">
-          {visibleElections.length === 0 ? (
-            <div className="p-12 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-sm">
-              <Vote className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
-                No Active Ballots
-              </h3>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto mt-1">
-                There are currently no active ballots available for selection in
-                your registered roster.
+          {/* Voter Header Panel */}
+          <div className="flex flex-col gap-4 items-start bg-transparent p-0">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                {linkedStudent && (!linkedStudent.status || linkedStudent.status === "approved") ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Verified Student: {linkedStudent.first_name} {linkedStudent.surname} ({linkedStudent.registration_number})</span>
+                  </span>
+                ) : linkedStudent && linkedStudent.status === "pending" ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40">
+                    <BadgeAlert className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Registration Pending Approval ({linkedStudent.registration_number})</span>
+                  </span>
+                ) : null}
+              </div>
+              <h2 className="text-3xl font-bold text-[#0B2D6B] dark:text-blue-400 font-['Poppins']">
+                Your Voice. Your Campus.
+              </h2>
+              <p className="text-[#667085] dark:text-zinc-400 font-['Montserrat'] mt-2 text-base">
+                Participate in the decisions that matter.
               </p>
             </div>
+            <div className="flex flex-wrap gap-4 mt-2 w-full sm:w-auto">
+              <button
+                type="button"
+                className="flex-1 sm:flex-none px-6 py-3 bg-[#1565D8] hover:bg-[#0D5BE1] text-white font-semibold text-sm rounded-[10px] shadow-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                onClick={() => onNavigate && onNavigate("elections")}
+              >
+                <Vote className="w-4 h-4" />
+                <span>Vote Now</span>
+                {visibleElections.length > 0 && (
+                  <span className="bg-white/20 text-white text-[11px] px-2 py-0.5 rounded-full font-bold ml-1">
+                    {visibleElections.length} Active
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                className="flex-1 sm:flex-none px-6 py-3 bg-white dark:bg-zinc-900 border border-[#1565D8] text-[#1565D8] dark:text-blue-400 font-semibold text-sm rounded-[10px] hover:bg-[#EAF2FF] dark:hover:bg-blue-900/30 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                onClick={() => onNavigate && onNavigate("results")}
+              >
+                <FileText className="w-4 h-4" />
+                <span>See Results</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Pending Verification Banner (if user has pending registration) */}
+          {linkedStudent && linkedStudent.status === "pending" && (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                  <BadgeAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-amber-900 dark:text-amber-200">
+                      Student Registration Pending Approval
+                    </span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                      Under Review
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                    Your student record for <strong>{linkedStudent.first_name} {linkedStudent.surname} ({linkedStudent.registration_number})</strong> is awaiting review. Once approved by an administrator, your full voting clearance will be active.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate("profile")}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer whitespace-nowrap self-stretch sm:self-auto text-center"
+              >
+                View Status in Profile &rarr;
+              </button>
+            </div>
+          )}
+
+          {/* Active Election Notification Banner (if any open elections) */}
+          {visibleElections.length > 0 && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#1565D8] text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Vote className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-[#0B2D6B] dark:text-blue-300 font-['Poppins']">
+                      Live Elections Open for Voting
+                    </span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#0E9F6E]/10 text-[#0E9F6E] dark:bg-emerald-950/60 dark:text-emerald-400 border border-[#0E9F6E]/20">
+                      Active
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#667085] dark:text-zinc-400 font-['Montserrat'] mt-0.5">
+                    {visibleElections.length} election{visibleElections.length === 1 ? "" : "s"} waiting for your ballot. Cast your vote securely now.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate("elections")}
+                className="px-4 py-2 bg-[#1565D8] hover:bg-[#0D5BE1] text-white text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer whitespace-nowrap self-stretch sm:self-auto text-center"
+              >
+                Go to Elections &rarr;
+              </button>
+            </div>
+          )}
+
+          {/* Campus Updates & Posts Focus */}
+          <div className="pt-2 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-2xl font-semibold text-[#0B2D6B] dark:text-blue-400 font-['Poppins']">
+                  Campus Updates & Announcements
+                </h3>
+                <p className="text-xs text-[#667085] dark:text-zinc-400 font-['Montserrat'] mt-0.5">
+                  Real-time broadcast posts, candidate news, and university updates.
+                </p>
+              </div>
+            </div>
+
+            <UpdatesFeed
+              currentUser={currentUser}
+              updates={updates}
+              updateLikes={updateLikes}
+              updateComments={updateComments}
+              newUpdateContent=""
+              setNewUpdateContent={() => {}}
+              handleCreateUpdate={() => {}}
+              handleDeleteUpdate={handleDeleteUpdate}
+              handleToggleLikeUpdate={handleToggleLikeUpdate}
+              newCommentContents={newCommentContents}
+              setNewCommentContents={setNewCommentContents}
+              handlePostComment={handlePostComment}
+              isAdmin={false}
+            />
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ================== ELECTIONS TAB (DEDICATED ELECTION BOOTH & BALLOTS) ================== */}
+      {(activeTab === "elections" || activeTab === "ballot") && (
+        <div id="active-elections-section" className="space-y-6">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-2xl font-semibold text-[#0B2D6B] dark:text-blue-400 font-['Poppins']">
+              Active Elections
+            </h3>
+            <p className="text-sm text-[#667085] dark:text-zinc-400 font-['Montserrat']">
+              Review candidates and cast your official vote for open positions.
+            </p>
+          </div>
+
+          {visibleElections.length === 0 ? (
+            <div className="p-12 text-center bg-white dark:bg-zinc-900 border border-[#E4E7EC] dark:border-zinc-800 rounded-2xl shadow-sm space-y-3">
+              <Vote className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto" />
+              <h3 className="text-lg font-semibold text-[#172033] dark:text-zinc-100 font-['Poppins']">
+                No Active Elections Available
+              </h3>
+              <p className="text-sm text-[#667085] dark:text-zinc-400 max-w-sm mx-auto font-['Montserrat']">
+                There are currently no active elections open for your account. You can check published results or view campus updates.
+              </p>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => onNavigate && onNavigate("results")}
+                  className="px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-200 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer"
+                >
+                  View Election Results
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate && onNavigate("home")}
+                  className="px-4 py-2 bg-[#1565D8] text-white text-xs font-semibold rounded-lg hover:bg-[#0D5BE1] cursor-pointer"
+                >
+                  Return to Home Feed
+                </button>
+              </div>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {visibleElections.map((election) => {
-                const hasVoted = votes.some(
+                const electionPositions = getElectionPositions(election);
+                const userVotesInElection = votes.filter(
                   (v) =>
                     v.voter_id === currentUser.id &&
                     v.election_id === election.id,
                 );
-                const recordedVote = votes.find(
-                  (v) =>
-                    v.voter_id === currentUser.id &&
-                    v.election_id === election.id,
-                );
+
+                // Check how many positions the user has voted for
+                const votedCount = electionPositions.filter((pos) =>
+                  userVotesInElection.some(
+                    (v) =>
+                      (v.position_id && v.position_id === pos.id) ||
+                      (!v.position_id &&
+                        pos.candidates.some((c) => c.name === v.candidate)),
+                  ),
+                ).length;
+
+                const allPositionsVoted =
+                  electionPositions.length > 0 &&
+                  votedCount === electionPositions.length;
 
                 return (
                   <div
                     key={election.id}
-                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 flex flex-col justify-between shadow-sm"
+                    className="bg-white dark:bg-zinc-900 border border-[#E4E7EC] dark:border-zinc-800 rounded-[16px] p-6 shadow-sm space-y-4"
                   >
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-lg text-zinc-950 dark:text-zinc-50">
+                    <div>
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div>
+                          <h4 className="font-semibold text-lg text-[#172033] dark:text-zinc-50 font-['Poppins'] leading-tight">
                             {election.title}
-                          </h3>
-                          {election.club_id && (
-                            <span className="text-[10px] bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 px-2 py-0.5 rounded-full font-semibold">
-                              Club Poll
-                            </span>
+                          </h4>
+                          {electionPositions.length > 0 && (
+                            <p className="text-sm text-[#667085] dark:text-zinc-400 mt-1 font-['Montserrat'] line-clamp-1">
+                              {electionPositions.map((p) => p.title).join(" • ")}
+                            </p>
                           )}
                         </div>
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                          {election.description}
-                        </p>
+                        {election.club_id && (
+                          <span className="text-[10px] bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 px-2 py-0.5 rounded-full font-bold border border-purple-200 dark:border-purple-900/40">
+                            Club Election
+                          </span>
+                        )}
                       </div>
 
-                      {hasVoted ? (
-                        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-900/30 flex items-center gap-3">
-                          <ShieldCheck className="w-5 h-5 text-emerald-500" />
-                          <div className="text-xs">
-                            <p className="font-semibold">
-                              Voted Cast Successfully
-                            </p>
-                            <p className="opacity-80 mt-0.5">
-                              Your receipt points to:{" "}
-                              <strong className="font-mono">
-                                {recordedVote?.candidate}
-                              </strong>
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                            Select candidate on sheet:
-                          </span>
-                          <div className="flex flex-col gap-2">
-                            {election.candidates.map((cand, idx) => (
-                              <label
-                                key={idx}
-                                className={`flex items-center gap-3 p-3 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${
-                                  selectedCandidates[election.id] ===
-                                  (typeof cand === "string" ? cand : cand.name)
-                                    ? "bg-blue-50/50 border-blue-500 dark:bg-blue-950/20"
-                                    : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/40"
-                                }`}
-                              >
-                                <input
-                                  type="radio"
-                                  name={`election-${election.id}`}
-                                  value={
-                                    typeof cand === "string" ? cand : cand.name
-                                  }
-                                  checked={
-                                    selectedCandidates[election.id] ===
-                                    (typeof cand === "string"
-                                      ? cand
-                                      : cand.name)
-                                  }
-                                  onChange={() =>
-                                    setSelectedCandidates((p) => ({
-                                      ...p,
-                                      [election.id]:
-                                        typeof cand === "string"
-                                          ? cand
-                                          : cand.name,
-                                    }))
-                                  }
-                                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                />
-                                <div className="flex items-center gap-3">
-                                  {typeof cand === "object" &&
-                                    cand.photo_url && (
-                                      <img
-                                        src={cand.photo_url}
-                                        alt={cand.name}
-                                        className="w-8 h-8 rounded-full object-cover"
-                                        referrerPolicy="no-referrer"
-                                      />
-                                    )}
-                                  <span>
-                                    {typeof cand === "string"
-                                      ? cand
-                                      : cand.name}
-                                  </span>
-                                </div>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      <div className="flex items-center gap-2 mt-4 text-[#0E9F6E] dark:text-emerald-400 text-sm font-semibold font-['Montserrat']">
+                        <span className="w-2 h-2 rounded-full bg-[#0E9F6E] dark:bg-emerald-400" />
+                        Voting open
+                      </div>
+                      
+                      <div className="mt-6 border-t border-[#E4E7EC] dark:border-zinc-800 pt-4">
+                        {allPositionsVoted ? (
+                           <div className="w-full py-3 bg-[#0E9F6E] text-white text-center font-semibold text-sm rounded-[10px] flex items-center justify-center gap-2">
+                             <Check className="w-4 h-4" /> Voted
+                           </div>
+                        ) : (
+                          <div className="flex flex-col gap-4">
+                             {electionPositions.map((pos) => {
+                               const existingVote = userVotesInElection.find(
+                                 (v) =>
+                                   (v.position_id && v.position_id === pos.id) ||
+                                   (!v.position_id &&
+                                     pos.candidates.some(
+                                       (c) => c.name === v.candidate,
+                                     )),
+                               );
+                               const selectionKey = `${election.id}_${pos.id}`;
+                               const currentSelection = selectedCandidates[selectionKey];
 
-                    {!hasVoted && (
-                      <button
-                        onClick={() => handleCastVote(election.id)}
-                        disabled={!selectedCandidates[election.id]}
-                        className="w-full mt-6 py-2.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-sm rounded-full disabled:opacity-50 transition-colors cursor-pointer"
-                      >
-                        Submit Encrypted Ballot Record
-                      </button>
-                    )}
+                               return (
+                                 <div key={pos.id} className="space-y-3">
+                                   <div className="flex items-center justify-between">
+                                      <span className="font-semibold text-sm text-[#172033] dark:text-zinc-100 font-['Poppins']">
+                                        {pos.title}
+                                      </span>
+                                      {existingVote && (
+                                        <span className="text-[11px] text-[#0E9F6E] font-semibold bg-[#E8F8F1] dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
+                                          Voted
+                                        </span>
+                                      )}
+                                   </div>
+                                   {existingVote ? (
+                                      <div className="p-3 bg-[#E8F8F1] dark:bg-emerald-950/20 border border-[#0E9F6E]/20 rounded-xl text-sm font-['Montserrat']">
+                                        You voted for <strong className="text-[#0E9F6E]">{existingVote.candidate}</strong>
+                                      </div>
+                                   ) : (
+                                     <div className="space-y-2">
+                                        {pos.candidates.map((cand) => (
+                                          <label
+                                            key={cand.id}
+                                            className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                                              currentSelection?.candidateName === cand.name
+                                                ? "bg-[#EAF2FF] border-[#1565D8] dark:bg-blue-950/40 text-[#0B2D6B] dark:text-blue-200"
+                                                : "bg-white dark:bg-zinc-900 border-[#E4E7EC] dark:border-zinc-700 hover:bg-[#F6F8FC] dark:hover:bg-zinc-800"
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              <input
+                                                type="radio"
+                                                name={`pos_${selectionKey}`}
+                                                value={cand.name}
+                                                checked={currentSelection?.candidateName === cand.name}
+                                                onChange={() =>
+                                                  setSelectedCandidates((prev) => ({
+                                                    ...prev,
+                                                    [selectionKey]: {
+                                                      candidateName: cand.name,
+                                                      candidateId: cand.id,
+                                                    },
+                                                  }))
+                                                }
+                                                className="w-4 h-4 text-[#1565D8] border-gray-300 focus:ring-[#1565D8] cursor-pointer"
+                                              />
+                                              {cand.photo_url ? (
+                                                <img
+                                                  src={cand.photo_url}
+                                                  alt={cand.name}
+                                                  className="w-7 h-7 rounded-full object-cover border border-zinc-200 dark:border-zinc-700"
+                                                  referrerPolicy="no-referrer"
+                                                />
+                                              ) : (
+                                                <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold text-xs flex items-center justify-center">
+                                                  {cand.name.charAt(0).toUpperCase()}
+                                                </div>
+                                              )}
+                                              <span className="font-medium text-sm text-[#172033] dark:text-zinc-100 font-['Montserrat']">
+                                                {cand.name}
+                                              </span>
+                                            </div>
+                                          </label>
+                                        ))}
+                                        {pos.candidates.length > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleCastVote(
+                                                election.id,
+                                                pos.id,
+                                                currentSelection?.candidateName || "",
+                                                currentSelection?.candidateId,
+                                              )
+                                            }
+                                            disabled={!currentSelection?.candidateName}
+                                            className="w-full py-2.5 mt-2 bg-[#1565D8] hover:bg-[#0D5BE1] disabled:bg-[#E4E7EC] disabled:text-[#98A2B3] text-white font-semibold text-sm rounded-[10px] transition-colors cursor-pointer"
+                                          >
+                                            Submit Vote
+                                          </button>
+                                        )}
+                                     </div>
+                                   )}
+                                 </div>
+                               );
+                             })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -332,25 +613,18 @@ export default function VoterDashboard({
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {visibleResults.map((election) => {
-                const resultsMap = votes
-                  .filter((v) => v.election_id === election.id)
-                  .reduce<Record<string, number>>((acc, curr) => {
-                    acc[curr.candidate] = (acc[curr.candidate] || 0) + 1;
-                    return acc;
-                  }, {});
-
-                const totalVotes = (
-                  Object.values(resultsMap) as number[]
-                ).reduce((a, b) => a + b, 0);
+                const electionPositions = getElectionPositions(election);
+                const electionVotes = votes.filter((v) => v.election_id === election.id);
+                const totalVotes = electionVotes.length;
 
                 return (
                   <div
                     key={election.id}
-                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm"
+                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm space-y-4"
                   >
-                    <div className="mb-4">
+                    <div>
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-semibold text-zinc-950 dark:text-zinc-50 text-base">
                           {election.title}
@@ -362,35 +636,93 @@ export default function VoterDashboard({
                         )}
                       </div>
                       <span className="text-[10px] font-mono text-zinc-400">
-                        Total votes: {totalVotes}
+                        Total ballots cast: {totalVotes} | Positions: {electionPositions.length}
                       </span>
                     </div>
 
-                    <div className="space-y-2">
-                      {election.candidates.map((cand, idx) => {
-                        const count =
-                          resultsMap[
-                            typeof cand === "string" ? cand : cand.name
-                          ] || 0;
-                        const pct =
-                          totalVotes > 0
-                            ? Math.round((count / totalVotes) * 100)
-                            : 0;
+                    {/* Results per Position */}
+                    <div className="space-y-3.5">
+                      {electionPositions.map((pos) => {
+                        const posVotes = electionVotes.filter(
+                          (v) =>
+                            (v.position_id && v.position_id === pos.id) ||
+                            pos.candidates.some((c) => c.name === v.candidate),
+                        );
+                        const posTotal = posVotes.length;
+
+                        const candCounts = pos.candidates.map((cand) => {
+                          const count = posVotes.filter(
+                            (v) =>
+                              (v.candidate_id && v.candidate_id === cand.id) ||
+                              v.candidate === cand.name,
+                          ).length;
+                          return {
+                            cand,
+                            count,
+                            pct: posTotal > 0 ? Math.round((count / posTotal) * 100) : 0,
+                          };
+                        });
+
+                        const maxVotes = Math.max(0, ...candCounts.map((c) => c.count));
+
                         return (
-                          <div key={idx} className="space-y-1">
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>
-                                {typeof cand === "string" ? cand : cand.name}
+                          <div
+                            key={pos.id}
+                            className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 space-y-2"
+                          >
+                            <div className="flex items-center justify-between border-b border-zinc-200/50 dark:border-zinc-700/50 pb-1">
+                              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                                <Award className="w-3.5 h-3.5 text-blue-600" />
+                                <span>{pos.title}</span>
                               </span>
-                              <span className="font-mono text-zinc-500">
-                                {count} votes ({pct}%)
+                              <span className="text-[10px] font-mono text-zinc-500">
+                                {posTotal} votes
                               </span>
                             </div>
-                            <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-[#0B1E40] rounded-full"
-                                style={{ width: `${pct}%` }}
-                              />
+
+                            <div className="space-y-2">
+                              {candCounts.map(({ cand, count, pct }) => {
+                                const isLeader = maxVotes > 0 && count === maxVotes;
+                                return (
+                                  <div key={cand.id} className="space-y-1">
+                                    <div className="flex justify-between text-xs font-semibold">
+                                      <div className="flex items-center gap-2">
+                                        {cand.photo_url ? (
+                                          <img
+                                            src={cand.photo_url}
+                                            alt={cand.name}
+                                            className="w-5 h-5 rounded-full object-cover border border-zinc-200"
+                                            referrerPolicy="no-referrer"
+                                          />
+                                        ) : (
+                                          <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold text-[9px] flex items-center justify-center">
+                                            {cand.name.charAt(0)}
+                                          </div>
+                                        )}
+                                        <span className="text-zinc-800 dark:text-zinc-200">
+                                          {cand.name}
+                                        </span>
+                                        {isLeader && (
+                                          <span className="text-[9px] bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.2 rounded font-bold">
+                                            Leading
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="font-mono text-zinc-500 text-[11px]">
+                                        {count} votes ({pct}%)
+                                      </span>
+                                    </div>
+                                    <div className="h-2 bg-zinc-200/70 dark:bg-zinc-700 rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full transition-all duration-500 ${
+                                          isLeader ? "bg-[#1565D8] dark:bg-blue-500" : "bg-zinc-400 dark:bg-zinc-600"
+                                        }`}
+                                        style={{ width: `${pct}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         );
@@ -424,24 +756,37 @@ export default function VoterDashboard({
 
       {activeTab === "profile" &&
         (() => {
-          const linkedStudent = students.find(
-            (s) =>
-              s.email?.toLowerCase() === currentUser.username.toLowerCase(),
-          );
+          const normUser = currentUser.username.trim().toLowerCase();
+          const linkedStudent = students.find((s) => {
+            const sEmail = s.email ? s.email.trim().toLowerCase() : "";
+            const sReg = s.registration_number ? s.registration_number.trim().toLowerCase() : "";
+            const sCum = s.cum_number ? s.cum_number.trim().toLowerCase() : "";
+            if (sEmail && sEmail === normUser) return true;
+            if (sReg && sReg === normUser) return true;
+            if (sCum && sCum === normUser) return true;
+            if (sEmail && normUser.includes("@") && sEmail.split("@")[0] === normUser.split("@")[0]) return true;
+            return false;
+          });
+
           return (
             <div
               className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto"
               id="voter_profile_dashboard"
             >
               {/* Student Profile Card */}
-              {linkedStudent ? (
+              {linkedStudent && (!linkedStudent.status || linkedStudent.status === "approved") ? (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col justify-between space-y-4">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="w-5 h-5 text-emerald-500" />
-                      <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                        Verified Student Profile
-                      </h3>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                          Verified Student Profile
+                        </h3>
+                      </div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40 rounded-full font-mono">
+                        Approved
+                      </span>
                     </div>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                       Your official CUNIMA verified registration card
@@ -508,7 +853,83 @@ export default function VoterDashboard({
 
                   <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-400 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/30 text-[11px] font-mono">
                     <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-                    <span>ELGIBILITY: REGISTERED VOTER APPROVED</span>
+                    <span>ELIGIBILITY: REGISTERED VOTER APPROVED</span>
+                  </div>
+                </div>
+              ) : linkedStudent && linkedStudent.status === "pending" ? (
+                <div className="bg-white dark:bg-zinc-900 border border-amber-200/80 dark:border-amber-900/50 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col justify-between space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <BadgeAlert className="w-5 h-5 text-amber-500" />
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                          Registration Pending Approval
+                        </h3>
+                      </div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40 rounded-full font-mono">
+                        Pending Review
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      Your submitted student record is currently under administrative review
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 text-xs flex-grow my-2">
+                    <div className="grid grid-cols-2 gap-3 bg-amber-50/40 dark:bg-amber-950/20 p-4 rounded-2xl border border-amber-100/60 dark:border-amber-900/30">
+                      <div>
+                        <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono">
+                          Submitted Name
+                        </span>
+                        <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                          {linkedStudent.first_name} {linkedStudent.surname}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono">
+                          Reg Number
+                        </span>
+                        <span className="text-sm font-semibold font-mono text-zinc-800 dark:text-zinc-200">
+                          {linkedStudent.registration_number}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 bg-zinc-50 dark:bg-zinc-950 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-900">
+                      <div>
+                        <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono">
+                          Program Course
+                        </span>
+                        <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          {linkedStudent.program_name}
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900 flex justify-between items-center">
+                        <div>
+                          <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono">
+                            Academic Year
+                          </span>
+                          <span className="text-xs font-semibold font-mono text-zinc-700 dark:text-zinc-300">
+                            {linkedStudent.academic_year}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono text-right">
+                            CUM Number
+                          </span>
+                          <span className="text-sm font-bold font-mono text-amber-600 dark:text-amber-400 block text-right">
+                            {linkedStudent.cum_number}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 p-3.5 rounded-xl border border-amber-200/60 dark:border-amber-900/40 text-xs flex items-start gap-2.5">
+                    <BadgeAlert className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <p className="leading-relaxed">
+                      Your details have been registered and are awaiting verification by the election administrator. Once approved, your official verified student profile and voting clearance will be activated.
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -516,14 +937,20 @@ export default function VoterDashboard({
                   <BadgeAlert className="w-12 h-12 text-amber-500" />
                   <div>
                     <h3 className="font-semibold text-zinc-800 dark:text-zinc-200 text-sm">
-                      No Approved Student Record Linked
+                      No Student Record Linked
                     </h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs mt-1">
-                      Your account is registered but does not have a linked
-                      verified student card in the registry database. Please
-                      contact your campus administrator.
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs mt-1 leading-relaxed">
+                      Your voter credentials are active, but no verified student card is connected to your account yet.
                     </p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsSubmissionModalOpen(true)}
+                    className="px-4 py-2.5 bg-[#1565D8] hover:bg-[#0D5BE1] text-white font-semibold text-xs rounded-full shadow-md shadow-blue-500/15 cursor-pointer transition-all active:scale-95"
+                  >
+                    Submit Student Registration Details →
+                  </button>
                 </div>
               )}
 
@@ -625,7 +1052,7 @@ export default function VoterDashboard({
                   <div className="pt-2">
                     <button
                       type="submit"
-                      className="w-full py-2.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
+                      className="w-full py-2.5 bg-[#1565D8] hover:bg-[#0D5BE1] text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
                     >
                       Save Credentials
                     </button>
@@ -635,6 +1062,166 @@ export default function VoterDashboard({
             </div>
           );
         })()}
+
+      {/* Student Profile Submission Modal */}
+      {isSubmissionModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-scaleUp max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                  Submit Student Profile
+                </h3>
+                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  Submit your student details to the administrator to connect your account and activate your voting eligibility.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSubmissionModalOpen(false)}
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 rounded-full cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitStudentProfile} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={subFirstName}
+                    onChange={(e) => setSubFirstName(e.target.value)}
+                    placeholder="e.g. Desire"
+                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    Surname
+                  </label>
+                  <input
+                    type="text"
+                    value={subSurname}
+                    onChange={(e) => setSubSurname(e.target.value)}
+                    placeholder="e.g. Kandodo"
+                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  University Email (@cunima.ac.mw)
+                </label>
+                <input
+                  type="email"
+                  value={subEmail}
+                  onChange={(e) => setSubEmail(e.target.value)}
+                  placeholder="e.g. desire.kandodo@cunima.ac.mw"
+                  className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    Registration ID
+                  </label>
+                  <input
+                    type="text"
+                    value={subRegNumber}
+                    onChange={(e) => setSubRegNumber(e.target.value)}
+                    placeholder="e.g. REG/CS/2026/011"
+                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    CUM Number
+                  </label>
+                  <input
+                    type="text"
+                    value={subCum}
+                    onChange={(e) => setSubCum(e.target.value)}
+                    placeholder="e.g. 3.75 or 76.5"
+                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  Program Course
+                </label>
+                <input
+                  type="text"
+                  value={subProgram}
+                  onChange={(e) => setSubProgram(e.target.value)}
+                  placeholder="e.g. BSc Computer Science"
+                  className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    Academic Year
+                  </label>
+                  <input
+                    type="text"
+                    value={subYear}
+                    onChange={(e) => setSubYear(e.target.value)}
+                    placeholder="e.g. 2026/2027"
+                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    Gender
+                  </label>
+                  <select
+                    value={subGender}
+                    onChange={(e) => setSubGender(e.target.value)}
+                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                  >
+                    <option value="M">Male (M)</option>
+                    <option value="F">Female (F)</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSubmissionModalOpen(false)}
+                  className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-800 text-zinc-500 text-xs font-semibold rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 bg-[#1565D8] hover:bg-[#0D5BE1] disabled:opacity-50 text-white font-semibold text-xs rounded-full shadow-md shadow-blue-500/15 transition-colors cursor-pointer text-center"
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Details"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

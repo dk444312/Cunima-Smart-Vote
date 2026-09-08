@@ -122,29 +122,29 @@ export default function UpdatesFeed({
             return (
               <div
                 key={upd.id}
-                className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4"
+                className="bg-white dark:bg-zinc-900 border border-[#E4E7EC] dark:border-zinc-800 rounded-[16px] p-5 shadow-sm space-y-4"
               >
                 <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center font-bold text-xs text-[#1a73e8]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#EAF2FF] dark:bg-blue-900/50 flex items-center justify-center font-bold text-sm text-[#1565D8]">
                       {upd.author.slice(0, 2).toUpperCase()}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-50">
+                        <span className="font-semibold text-sm text-[#172033] dark:text-zinc-50 font-['Montserrat']">
                           {upd.author}
                         </span>
                         <span
-                          className="inline-flex items-center justify-center bg-[#0095F6] text-white rounded-full w-4 h-4 shadow-sm"
+                          className="inline-flex items-center justify-center bg-[#1565D8] text-white rounded-full w-4 h-4 shadow-sm"
                           title="Meta Verified Admin"
                         >
                           <Check className="w-2.5 h-2.5 stroke-[4.5px]" />
                         </span>
-                        <span className="text-[10px] bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold border border-blue-100 dark:border-blue-900/20">
+                        <span className="text-[10px] bg-[#EAF2FF] dark:bg-blue-950/60 text-[#1565D8] dark:text-blue-400 px-2 py-0.5 rounded-full font-bold border border-[#1565D8]/20">
                           Verified Admin
                         </span>
                       </div>
-                      <span className="text-[10px] text-zinc-400 font-mono">
+                      <span className="text-[11px] text-[#667085] font-mono">
                         {new Date(upd.created_at).toLocaleString()}
                       </span>
                     </div>
@@ -153,7 +153,7 @@ export default function UpdatesFeed({
                   {isAdmin && (
                     <button
                       onClick={() => handleDeleteUpdate(upd.id)}
-                      className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full transition-colors cursor-pointer"
+                      className="p-1.5 text-[#D92D20] hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full transition-colors cursor-pointer"
                       title="Delete this update post"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -161,28 +161,28 @@ export default function UpdatesFeed({
                   )}
                 </div>
 
-                <div className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap">
+                <div className="text-sm text-[#172033] dark:text-zinc-200 leading-relaxed whitespace-pre-wrap font-['Montserrat']">
                   {upd.content}
                 </div>
 
-                <div className="flex items-center gap-6 pt-3 border-t border-zinc-100 dark:border-zinc-800 text-xs font-mono">
+                <div className="flex items-center gap-6 pt-3 text-xs font-['Montserrat'] text-[#667085]">
                   <button
                     onClick={() => handleToggleLikeUpdate(upd.id)}
                     className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
                       hasLiked
-                        ? "text-red-500 font-semibold"
-                        : "text-zinc-500 hover:text-red-500"
+                        ? "text-[#1565D8] font-semibold"
+                        : "text-[#667085] hover:text-[#1565D8]"
                     }`}
                   >
                     <Heart
-                      className={`w-4 h-4 ${hasLiked ? "fill-red-500 text-red-500" : ""}`}
+                      className={`w-4 h-4 ${hasLiked ? "fill-[#1565D8] text-[#1565D8]" : ""}`}
                     />
                     <span>
                       {likes.length} {likes.length === 1 ? "Like" : "Likes"}
                     </span>
                   </button>
 
-                  <div className="flex items-center gap-1.5 text-zinc-505">
+                  <div className="flex items-center gap-1.5 cursor-pointer hover:text-[#1565D8] transition-colors">
                     <MessageCircle className="w-4 h-4" />
                     <span>
                       {comments.length}{" "}
@@ -191,7 +191,7 @@ export default function UpdatesFeed({
                   </div>
                 </div>
 
-                <div className="bg-zinc-50 dark:bg-zinc-800/20 rounded-xl p-4 space-y-4">
+                <div className="bg-[#F6F8FC] dark:bg-zinc-800/20 rounded-[12px] p-4 space-y-4">
                   {comments.length > 0 && (
                     <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                       {comments.map((c) => {

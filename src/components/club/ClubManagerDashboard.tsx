@@ -22,7 +22,7 @@ import {
   UpdateLikeRow,
   UpdateCommentRow,
 } from "../../types.ts";
-import { dbService } from "../../lib/supabase.ts";
+import { dbService, getElectionPositions } from "../../lib/supabase.ts";
 import UpdatesFeed from "../shared/UpdatesFeed.tsx";
 
 interface ClubManagerDashboardProps {
@@ -100,11 +100,17 @@ export default function ClubManagerDashboard({
     }
 
     const finalCandidates = [...candidates];
-    if (
-      candidateInput.trim() &&
-      !finalCandidates.includes(candidateInput.trim())
-    ) {
-      finalCandidates.push(candidateInput.trim());
+    if (candidateInput.trim()) {
+      const exists = finalCandidates.some(
+        (c) => (typeof c === "string" ? c : c.name) === candidateInput.trim(),
+      );
+      if (!exists) {
+        if (candidatePhoto) {
+          finalCandidates.push({ name: candidateInput.trim(), photo_url: candidatePhoto });
+        } else {
+          finalCandidates.push(candidateInput.trim());
+        }
+      }
     }
 
     const defaultCandidates =
@@ -126,6 +132,7 @@ export default function ClubManagerDashboard({
       setElectionTitle("");
       setElectionDesc("");
       setCandidateInput("");
+      setCandidatePhoto("");
       setCandidates([]);
       showToast(
         `SQL INSERT SUCCESS: Created club election "${created.title}" successfully.`,
@@ -155,14 +162,26 @@ export default function ClubManagerDashboard({
         return;
       }
 
+      const electionPositions = getElectionPositions(election);
+
       await Promise.all(
         activeClubMembers.map(async (voter) => {
           try {
-            const randomCandidate =
-              election.candidates[
-                Math.floor(Math.random() * election.candidates.length)
-              ];
-            await dbService.insertVote(voter.id, electionId, randomCandidate);
+            for (const pos of electionPositions) {
+              if (pos.candidates.length > 0) {
+                const randomCandidate =
+                  pos.candidates[
+                    Math.floor(Math.random() * pos.candidates.length)
+                  ];
+                await dbService.insertVote(
+                  voter.id,
+                  electionId,
+                  randomCandidate.name,
+                  pos.id,
+                  randomCandidate.id,
+                );
+              }
+            }
           } catch (e) {
             // skip duplicate voters gracefully
           }
@@ -340,27 +359,62 @@ export default function ClubManagerDashboard({
                     <label className="text-xs font-semibold text-zinc-500">
                       Candidates Slates
                     </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Candidate name"
-                        value={candidateInput}
-                        onChange={(e) => setCandidateInput(e.target.value)}
-                        className="w-full px-3 py-1.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:border-purple-500 text-xs text-zinc-900 dark:text-zinc-100"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const val = candidateInput.trim();
-                          if (val && !candidates.includes(val)) {
-                            setCandidates([...candidates, val]);
-                            setCandidateInput("");
-                          }
-                        }}
-                        className="px-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-200 rounded-xl"
-                      >
-                        Add
-                      </button>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Candidate name"
+                          value={candidateInput}
+                          onChange={(e) => setCandidateInput(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:border-purple-500 text-xs text-zinc-900 dark:text-zinc-100"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = candidateInput.trim();
+                            const exists = candidates.some(
+                              (c) => (typeof c === "string" ? c : c.name) === val,
+                            );
+                            if (val && !exists) {
+                              if (candidatePhoto) {
+                                setCandidates([...candidates, { name: val, photo_url: candidatePhoto }]);
+                                setCandidatePhoto("");
+                              } else {
+                                setCandidates([...candidates, val]);
+                              }
+                              setCandidateInput("");
+                            }
+                          }}
+                          className="px-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-200 rounded-xl cursor-pointer"
+                        >
+                          Add
+                        </button>
+                      </div>
+
+                      <div className="space-y-1">
+                        <LargeFileUploader
+                          onUploadSuccess={(url) => setCandidatePhoto(url)}
+                          label="Candidate Photo (Upload to Cloudflare R2)"
+                        />
+                        {candidatePhoto && (
+                          <div className="flex items-center gap-2 p-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs">
+                            <img
+                              src={candidatePhoto}
+                              alt="Candidate preview"
+                              className="w-6 h-6 rounded-full object-cover border border-emerald-300"
+                              referrerPolicy="no-referrer"
+                            />
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-300">Photo attached to next candidate</span>
+                            <button
+                              type="button"
+                              onClick={() => setCandidatePhoto("")}
+                              className="ml-auto text-zinc-400 hover:text-red-500 cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap gap-1 pt-1">
@@ -396,7 +450,7 @@ export default function ClubManagerDashboard({
 
                   <button
                     type="submit"
-                    className="w-full py-2 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer"
+                    className="w-full py-2 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer"
                   >
                     Publish Club Election Row
                   </button>
@@ -533,15 +587,25 @@ export default function ClubManagerDashboard({
                             </div>
 
                             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                              <div className="flex gap-1 flex-wrap">
+                              <div className="flex gap-1.5 flex-wrap">
                                 {election.candidates.map((cand, idx) => (
                                   <span
                                     key={idx}
-                                    className="text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2.5 py-0.5 rounded-full border border-zinc-200/50 dark:border-zinc-700"
+                                    className="text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-full border border-zinc-200/50 dark:border-zinc-700 flex items-center gap-1.5"
                                   >
-                                    {typeof cand === "string"
-                                      ? cand
-                                      : cand.name}
+                                    {typeof cand === "object" && cand.photo_url && (
+                                      <img
+                                        src={cand.photo_url}
+                                        alt={cand.name}
+                                        className="w-3.5 h-3.5 rounded-full object-cover"
+                                        referrerPolicy="no-referrer"
+                                      />
+                                    )}
+                                    <span>
+                                      {typeof cand === "string"
+                                        ? cand
+                                        : cand.name}
+                                    </span>
                                   </span>
                                 ))}
                               </div>
@@ -749,7 +813,7 @@ export default function ClubManagerDashboard({
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="w-full py-2.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
+                    className="w-full py-2.5 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
                   >
                     Update Credentials
                   </button>

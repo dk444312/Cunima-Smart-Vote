@@ -27,12 +27,14 @@ import {
   PieChart,
   Bell,
   List,
+  Home,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   dbService,
   isSupabaseConfigured,
   initializeDatabase,
+  getElectionPositions,
   PREMADE_ADMIN,
   PREMADE_VOTER,
   PREMADE_MANAGER,
@@ -48,6 +50,8 @@ import {
   ClubRow,
   ClubMemberRow,
   StudentRow,
+  Position,
+  Candidate,
 } from "./types.ts";
 import { signInWithGoogle, logoutFirebase } from "./lib/firebase.ts";
 
@@ -83,15 +87,21 @@ export default function App() {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Google Student Registration Form States
+  // Student Registration Form States (Google or Username/Password Auth)
   const [pendingGoogleUser, setPendingGoogleUser] = useState<{
     email: string;
     displayName: string;
-    uid: string;
+    uid?: string;
+    source?: "google" | "credentials" | "manual";
+    customMessage?: string;
   } | null>(null);
   const [googleRegSuccess, setGoogleRegSuccess] = useState(false);
+  const [unregisteredUsernamePrompt, setUnregisteredUsernamePrompt] = useState<
+    string | null
+  >(null);
   const [regFirstName, setRegFirstName] = useState("");
   const [regSurname, setRegSurname] = useState("");
+  const [regEmail, setRegEmail] = useState("");
   const [regNumber, setRegNumber] = useState("");
   const [regProgram, setRegProgram] = useState("");
   const [regYear, setRegYear] = useState("");
@@ -116,6 +126,18 @@ export default function App() {
   const [candidateInput, setCandidateInput] = useState("");
   const [candidates, setCandidates] = useState<any[]>([]);
   const [candidatePhoto, setCandidatePhoto] = useState("");
+  const [positions, setPositions] = useState<Position[]>([
+    {
+      id: "pos_pres",
+      title: "President",
+      candidates: [],
+    },
+    {
+      id: "pos_vp",
+      title: "Vice President",
+      candidates: [],
+    },
+  ]);
 
   const [newVoterUsername, setNewVoterUsername] = useState("");
   const [newVoterPassword, setNewVoterPassword] = useState("");
@@ -227,7 +249,7 @@ export default function App() {
       } else if (currentUser.role === "club_manager") {
         setActiveMenu("club_elections");
       } else {
-        setActiveMenu("ballot");
+        setActiveMenu("home");
       }
     }
   }, [currentUser]);
@@ -241,10 +263,120 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+  // Helper to check if a user identifier is connected to an approved student profile
+  const findMatchingStudent = (
+    identifier: string,
+    studentsList: StudentRow[],
+  ): StudentRow | undefined => {
+    const cleanId = identifier.toLowerCase().trim();
+    if (!cleanId) return undefined;
+
+    return studentsList.find((s) => {
+      // 1. Direct Email Match
+      if (s.email && s.email.toLowerCase().trim() === cleanId) {
+        return true;
+      }
+
+      // 2. Direct Registration Number Match
+      if (
+        s.registration_number &&
+        s.registration_number.toLowerCase().trim() === cleanId
+      ) {
+        return true;
+      }
+
+      // 3. If identifier is an email, parse local part (e.g. "desire.kandodo@cunima.ac.mw")
+      if (cleanId.includes("@")) {
+        const emailLocalPart = cleanId.split("@")[0].toLowerCase().trim();
+        const emailParts = emailLocalPart
+          .split(/[\._\-]/)
+          .filter((p) => p.length > 0);
+        const cleanLocalPart = emailLocalPart.replace(/[^a-z0-9]/g, "");
+        const cleanFirst = s.first_name
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]/g, "");
+        const cleanSurname = s.surname
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]/g, "");
+
+        if (
+          cleanLocalPart === cleanFirst + cleanSurname ||
+          cleanLocalPart === cleanSurname + cleanFirst
+        ) {
+          return true;
+        }
+        if (
+          emailParts.includes(cleanFirst) &&
+          emailParts.includes(cleanSurname)
+        ) {
+          return true;
+        }
+      } else {
+        // 4. Identifier might be username like "desire.kandodo" or "kandodo"
+        const userParts = cleanId.split(/[\._\-]/).filter((p) => p.length > 0);
+        const cleanUsername = cleanId.replace(/[^a-z0-9]/g, "");
+        const cleanFirst = s.first_name
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]/g, "");
+        const cleanSurname = s.surname
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]/g, "");
+
+        if (
+          cleanUsername === cleanFirst + cleanSurname ||
+          cleanUsername === cleanSurname + cleanFirst
+        ) {
+          return true;
+        }
+        if (
+          userParts.includes(cleanFirst) &&
+          userParts.includes(cleanSurname)
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+  };
+
+  const openSubmissionForm = (
+    accountIdentifier?: string,
+    source: "google" | "credentials" | "manual" = "credentials",
+    noticeMessage?: string,
+  ) => {
+    const rawInput = (accountIdentifier || usernameInput).trim();
+    const isEmail = rawInput.includes("@");
+    const defaultEmail = isEmail
+      ? rawInput
+      : rawInput
+        ? `${rawInput.toLowerCase()}@cunima.ac.mw`
+        : "";
+
+    setPendingGoogleUser({
+      email: defaultEmail,
+      displayName: rawInput || "Student Voter",
+      uid: "cred_" + Date.now(),
+      source,
+      customMessage: noticeMessage,
+    });
+    setRegEmail(defaultEmail);
+    if (!isEmail && rawInput) {
+      setRegNumber(rawInput);
+    }
+    setLoginError("");
+    setUnregisteredUsernamePrompt(null);
+  };
+
   // Auth Operations
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
+    setUnregisteredUsernamePrompt(null);
 
     const user = usernameInput.trim();
     const pass = passwordInput.trim();
@@ -283,6 +415,51 @@ export default function App() {
           return;
         }
 
+        // Admin accounts do not need student registry linkage
+        if (matchedVoter.role === "admin") {
+          const adminUser = {
+            id: matchedVoter.id,
+            username: matchedVoter.username,
+            role: "admin" as const,
+          };
+          setCurrentUser(adminUser);
+          localStorage.setItem(
+            "g_election_active_user",
+            JSON.stringify(adminUser),
+          );
+          setUsernameInput("");
+          setPasswordInput("");
+          showToast("Access Granted: Welcome back, Administrator.");
+          return;
+        }
+
+        // Check if student profile is connected in Socrates student directory!
+        const matchedStudent = findMatchingStudent(
+          matchedVoter.username,
+          students,
+        );
+
+        if (!matchedStudent) {
+          // Account credentials verified, but student record is NOT connected!
+          // Show the student submission form!
+          openSubmissionForm(
+            matchedVoter.username,
+            "credentials",
+            "Account credentials verified, but your student record is not yet connected in the database. Please submit your registration details to the administrator.",
+          );
+          showToast(
+            "Account verified, but not connected to a student record. Please submit your details.",
+          );
+          return;
+        }
+
+        if (matchedStudent.status === "pending") {
+          setLoginError(
+            "Your student registration application is currently pending administrator approval. Please wait for approval before accessing ballots.",
+          );
+          return;
+        }
+
         const voterUser = {
           id: matchedVoter.id,
           username: matchedVoter.username,
@@ -303,8 +480,9 @@ export default function App() {
       }
     } else {
       setLoginError(
-        "Account does not exist. Verify username or contact administrator.",
+        `Account "${user}" is not in the database. If you are a student, submit your registration details below.`,
       );
+      setUnregisteredUsernamePrompt(user);
     }
   };
 
@@ -540,6 +718,7 @@ export default function App() {
 
     try {
       setIsLoading(true);
+      const emailToUse = (regEmail || pendingGoogleUser.email || "").trim().toLowerCase();
       await dbService.insertStudent({
         first_name: regFirstName.trim(),
         surname: regSurname.trim(),
@@ -548,13 +727,14 @@ export default function App() {
         academic_year: regYear.trim(),
         cum_number: regCum.trim(),
         gender: regGender.trim(),
-        email: pendingGoogleUser.email,
+        email: emailToUse || null,
         status: "pending", // Needs to be approved by administrator!
       });
 
       // Reset fields
       setRegFirstName("");
       setRegSurname("");
+      setRegEmail("");
       setRegNumber("");
       setRegProgram("");
       setRegYear("");
@@ -593,36 +773,70 @@ export default function App() {
       return;
     }
 
-    const finalCandidates = [...candidates];
-    if (
-      candidateInput.trim() &&
-      !finalCandidates.some((c) => (typeof c === "string" ? c : c.name) === candidateInput.trim())
-    ) {
-      if (candidatePhoto) {
-        finalCandidates.push({ name: candidateInput.trim(), photo_url: candidatePhoto });
-      } else {
-        finalCandidates.push(candidateInput.trim());
-      }
-    }
-    setCandidatePhoto("");
+    // Filter out positions with empty title
+    let validPositions = positions.filter((p) => p.title.trim().length > 0);
 
-    const slates = finalCandidates.length > 0 ? finalCandidates : ["Yes", "No"];
+    // Fallback: If no positions defined or empty, create from candidates or default slates
+    if (validPositions.length === 0) {
+      const finalCandidates = [...candidates];
+      if (
+        candidateInput.trim() &&
+        !finalCandidates.some((c) => (typeof c === "string" ? c : c.name) === candidateInput.trim())
+      ) {
+        if (candidatePhoto) {
+          finalCandidates.push({ id: `cand_${Date.now()}`, name: candidateInput.trim(), photo_url: candidatePhoto });
+        } else {
+          finalCandidates.push({ id: `cand_${Date.now()}`, name: candidateInput.trim() });
+        }
+      }
+      const slates = finalCandidates.length > 0 ? finalCandidates : [
+        { id: "cand_1", name: "Candidate A" },
+        { id: "cand_2", name: "Candidate B" },
+      ];
+      validPositions = [
+        {
+          id: `pos_${Date.now()}`,
+          title: "Executive Office",
+          candidates: slates.map((s, idx) =>
+            typeof s === "string" ? { id: `cand_${idx}`, name: s } : s
+          ),
+        },
+      ];
+    }
+
+    // For legacy candidates column, flatten candidates
+    const legacyCandidates = validPositions.flatMap((p) => p.candidates);
 
     try {
       setIsLoading(true);
       await dbService.insertElection(
         newElectionTitle.trim(),
         newElectionDesc.trim(),
-        slates,
+        legacyCandidates,
         null,
+        "draft",
+        validPositions,
       );
       await refreshDatabaseState();
 
       setNewElectionTitle("");
       setNewElectionDesc("");
       setCandidateInput("");
+      setCandidatePhoto("");
       setCandidates([]);
-      showToast("SQL INSERT SUCCESS: Created new public election row.");
+      setPositions([
+        {
+          id: `pos_${Date.now()}_1`,
+          title: "President",
+          candidates: [],
+        },
+        {
+          id: `pos_${Date.now()}_2`,
+          title: "Vice President",
+          candidates: [],
+        },
+      ]);
+      showToast("SQL INSERT SUCCESS: Created new structured election with positions and candidate photos.");
     } catch (err: any) {
       showToast(`SQL INSERT FAIL: ${err.message}`);
     } finally {
@@ -674,14 +888,26 @@ export default function App() {
         return;
       }
 
+      const electionPositions = getElectionPositions(election);
+
       await Promise.all(
         activeVoters.map(async (voter) => {
           try {
-            const randomCandidate =
-              election.candidates[
-                Math.floor(Math.random() * election.candidates.length)
-              ];
-            await dbService.insertVote(voter.id, electionId, randomCandidate);
+            for (const pos of electionPositions) {
+              if (pos.candidates.length > 0) {
+                const randomCandidate =
+                  pos.candidates[
+                    Math.floor(Math.random() * pos.candidates.length)
+                  ];
+                await dbService.insertVote(
+                  voter.id,
+                  electionId,
+                  randomCandidate.name,
+                  pos.id,
+                  randomCandidate.id,
+                );
+              }
+            }
           } catch (e) {
             // gracefully skip duplicate voter constraints
           }
@@ -691,7 +917,7 @@ export default function App() {
       await dbService.updateElection(electionId, { status: "completed" });
       await refreshDatabaseState();
       showToast(
-        `SQL SIMULATION: Distributed random ballot entries to active voter base.`,
+        `SQL SIMULATION: Distributed random ballot entries across all positions to active voter base.`,
       );
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -945,7 +1171,7 @@ export default function App() {
       {/* GLOBAL BANNER */}
       <header className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 py-3.5 px-6 sticky top-0 z-40 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#0B1E40] flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <div className="w-8 h-8 rounded-full bg-[#0B2D6B] flex items-center justify-center text-white shadow-md shadow-blue-500/20">
             <Vote className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -1050,14 +1276,25 @@ export default function App() {
                     CUNIMA Student Registration
                   </h3>
                   <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    Your Google account is authenticated, but your student
-                    record is not yet in the voter database. Please submit your
-                    registration details to the administrator.
+                    {pendingGoogleUser.customMessage ||
+                      (pendingGoogleUser.source === "google"
+                        ? "Your Google account is authenticated, but your student record is not yet in the voter database. Please submit your registration details to the administrator."
+                        : "Your credentials are verified, but your account is not yet connected to a student record in the database. Please submit your details below for verification.")}
                   </p>
                 </div>
 
-                <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-full border border-blue-100 dark:border-blue-900/30 text-[11px] text-blue-800 dark:text-blue-300 font-mono break-all">
-                  Connected: {pendingGoogleUser.email}
+                <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-2xl border border-blue-100 dark:border-blue-900/30 text-[11px] text-blue-800 dark:text-blue-300 font-mono flex items-center justify-between gap-2">
+                  <span className="truncate">
+                    Account:{" "}
+                    <strong className="text-blue-950 dark:text-blue-100">
+                      {pendingGoogleUser.displayName || pendingGoogleUser.email}
+                    </strong>
+                  </span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 flex-shrink-0">
+                    {pendingGoogleUser.source === "google"
+                      ? "Google Account"
+                      : "Credential Login"}
+                  </span>
                 </div>
 
                 <form onSubmit={handleRegisterSubmit} className="space-y-4">
@@ -1088,6 +1325,20 @@ export default function App() {
                         required
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      University Email (@cunima.ac.mw)
+                    </label>
+                    <input
+                      type="email"
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="e.g. desire.kandodo@cunima.ac.mw"
+                      className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-full focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                      required
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -1177,7 +1428,7 @@ export default function App() {
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="flex-1 py-2.5 bg-[#0B1E40] hover:bg-blue-900 disabled:opacity-50 text-white font-semibold text-xs rounded-full shadow-md shadow-blue-500/15 transition-colors cursor-pointer text-center"
+                      className="flex-1 py-2.5 bg-[#1565D8] hover:bg-blue-900 disabled:opacity-50 text-white font-semibold text-xs rounded-full shadow-md shadow-blue-500/15 transition-colors cursor-pointer text-center"
                     >
                       {isLoading ? "Submitting..." : "Submit Registration"}
                     </button>
@@ -1305,7 +1556,7 @@ export default function App() {
                         );
                       }
                     }}
-                    className="flex-1 py-3 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-500/10 transition-all active:scale-95 cursor-pointer text-center"
+                    className="flex-1 py-3 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-500/10 transition-all active:scale-95 cursor-pointer text-center"
                   >
                     Yes, Confirm & Explore
                   </button>
@@ -1404,7 +1655,7 @@ export default function App() {
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 py-3 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-xs rounded-full shadow-lg shadow-amber-500/10 transition-all cursor-pointer text-center"
+                      className="flex-1 py-3 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-xs rounded-full shadow-lg shadow-amber-500/10 transition-all cursor-pointer text-center"
                     >
                       Unlock Session
                     </button>
@@ -1469,9 +1720,30 @@ export default function App() {
                 {/* GOOGLE SIGN IN - PRIMARY ENTRANCE */}
                 <div className="space-y-4">
                   {loginError && (
-                    <div className="p-3.5 rounded-full bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-xs font-medium flex items-center gap-2 border border-red-200 dark:border-red-900/50">
+                    <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-xs font-medium flex items-center gap-2 border border-red-200 dark:border-red-900/50">
                       <ShieldAlert className="w-4 h-4 flex-shrink-0" />
                       <span>{loginError}</span>
+                    </div>
+                  )}
+
+                  {unregisteredUsernamePrompt && (
+                    <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                      <div className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
+                        Account is not connected to the student registry.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openSubmissionForm(
+                            unregisteredUsernamePrompt,
+                            "credentials",
+                            `Account "${unregisteredUsernamePrompt}" is not connected to a student record. Submit your details for verification.`,
+                          )
+                        }
+                        className="px-3.5 py-1.5 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-xs rounded-full whitespace-nowrap cursor-pointer transition-all active:scale-95 text-center"
+                      >
+                        Submit Student Details →
+                      </button>
                     </div>
                   )}
 
@@ -1479,7 +1751,7 @@ export default function App() {
                     type="button"
                     onClick={handleGoogleSignIn}
                     disabled={isLoading}
-                    className="w-full py-3.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-sm rounded-full flex items-center justify-center gap-2.5 shadow-lg shadow-blue-500/15 border-none transition-all active:scale-95 cursor-pointer"
+                    className="w-full py-3.5 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-sm rounded-full flex items-center justify-center gap-2.5 shadow-lg shadow-blue-500/15 border-none transition-all active:scale-95 cursor-pointer"
                     id="btn_google_signin"
                   >
                     <svg
@@ -1562,6 +1834,22 @@ export default function App() {
                       ? "Validating Session..."
                       : "Verify Username & Password"}
                   </button>
+
+                  <div className="text-center pt-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openSubmissionForm(
+                          usernameInput,
+                          "manual",
+                          "Submit your student registration details to the administrator for verification.",
+                        )
+                      }
+                      className="text-xs text-[#1565D8] dark:text-blue-400 hover:underline font-medium cursor-pointer"
+                    >
+                      Not in the database yet? Submit student details
+                    </button>
+                  </div>
                 </form>
 
                 {/* SANDBOX PREMADE CREDS DECK */}
@@ -1621,7 +1909,7 @@ export default function App() {
           <div className="flex-1 flex flex-col md:flex-row">
             {/* SIDEBAR FOR ALL ROLES */}
             <aside
-              className={`w-full md:w-64 bg-[#0B1E40] text-white flex flex-col justify-between ${isSidebarOpen ? "block" : "hidden md:flex"}`}
+              className={`w-full md:w-64 bg-[#0B2D6B] text-white flex flex-col justify-between ${isSidebarOpen ? "block" : "hidden md:flex"}`}
             >
               <div className="p-4 space-y-6">
                 <span className="text-xs font-bold tracking-wider text-blue-300 uppercase font-mono block px-3">
@@ -1649,6 +1937,31 @@ export default function App() {
                         </div>
                         <span className="bg-blue-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
                           {elections.filter((e) => !e.club_id).length}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => setActiveMenu("candidates")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "candidates"
+                            ? "bg-white/20 text-white font-bold"
+                            : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <UserCheck className="w-4 h-4" />
+                          <span>Candidates</span>
+                        </div>
+                        <span className="bg-blue-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                          {elections.reduce(
+                            (acc, el) =>
+                              acc +
+                              getElectionPositions(el).reduce(
+                                (pAcc, p) => pAcc + p.candidates.length,
+                                0
+                              ),
+                            0
+                          )}
                         </span>
                       </button>
 
@@ -1847,23 +2160,61 @@ export default function App() {
                   {currentUser.role === "voter" && (
                     <>
                       <button
-                        onClick={() => setActiveMenu("ballot")}
+                        onClick={() => setActiveMenu("home")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "ballot"
-                            ? "bg-white/20 text-white"
+                          activeMenu === "home"
+                            ? "bg-white/20 text-white font-bold"
+                            : "text-blue-100 hover:bg-white/10"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Home className="w-4 h-4" />
+                          <span>Home</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setActiveMenu("elections")}
+                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                          activeMenu === "elections" || activeMenu === "ballot"
+                            ? "bg-white/20 text-white font-bold"
                             : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
                           <Vote className="w-4 h-4" />
-                          <span>My Ballots</span>
+                          <span>Elections</span>
                         </div>
+                        {elections.filter(
+                          (e) =>
+                            e.status === "active" &&
+                            (!e.club_id ||
+                              clubMembers.some(
+                                (cm) =>
+                                  cm.club_id === e.club_id &&
+                                  cm.voter_id === currentUser.id,
+                              )),
+                        ).length > 0 && (
+                          <span className="bg-blue-900 text-[10px] px-2 py-0.5 rounded-full font-bold text-white">
+                            {
+                              elections.filter(
+                                (e) =>
+                                  e.status === "active" &&
+                                  (!e.club_id ||
+                                    clubMembers.some(
+                                      (cm) =>
+                                        cm.club_id === e.club_id &&
+                                        cm.voter_id === currentUser.id,
+                                    )),
+                              ).length
+                            }
+                          </span>
+                        )}
                       </button>
                       <button
                         onClick={() => setActiveMenu("results")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
                           activeMenu === "results"
-                            ? "bg-white/20 text-white"
+                            ? "bg-white/20 text-white font-bold"
                             : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
@@ -1873,23 +2224,10 @@ export default function App() {
                         </div>
                       </button>
                       <button
-                        onClick={() => setActiveMenu("updates")}
-                        className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          activeMenu === "updates"
-                            ? "bg-white/20 text-white"
-                            : "text-blue-100 hover:bg-white/10"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Bell className="w-4 h-4" />
-                          <span>Election Updates</span>
-                        </div>
-                      </button>
-                      <button
                         onClick={() => setActiveMenu("profile")}
                         className={`w-full text-left px-4 py-2.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
                           activeMenu === "profile"
-                            ? "bg-white/20 text-white"
+                            ? "bg-white/20 text-white font-bold"
                             : "text-blue-100 hover:bg-white/10"
                         }`}
                       >
@@ -1944,6 +2282,8 @@ export default function App() {
                   candidatePhoto={candidatePhoto}
                   setCandidatePhoto={setCandidatePhoto}
                   setCandidates={setCandidates}
+                  positions={positions}
+                  setPositions={setPositions}
                   handleCreateElection={handleCreateElection}
                   newVoterUsername={newVoterUsername}
                   setNewVoterUsername={setNewVoterUsername}
@@ -2026,6 +2366,7 @@ export default function App() {
                   showToast={showToast}
                   setIsLoading={setIsLoading}
                   activeTab={activeMenu}
+                  onNavigate={(tab) => setActiveMenu(tab)}
                 />
               )}
             </main>

@@ -14,7 +14,34 @@ import {
   ClubRow,
   ClubMemberRow,
   StudentRow,
+  Position,
+  Candidate,
 } from "../types.ts";
+
+export function getElectionPositions(election: ElectionRow): Position[] {
+  if (election.positions && Array.isArray(election.positions) && election.positions.length > 0) {
+    return election.positions;
+  }
+  // Convert legacy candidates list into a default position
+  const candidates: Candidate[] = (election.candidates || []).map((c, idx) => {
+    if (typeof c === "string") {
+      return { id: `cand_${idx}`, name: c };
+    }
+    return {
+      id: c.id || `cand_${idx}`,
+      name: c.name || "Candidate",
+      photo_url: c.photo_url,
+      manifesto: c.manifesto,
+    };
+  });
+  return [
+    {
+      id: "general",
+      title: "General Candidates",
+      candidates,
+    },
+  ];
+}
 
 const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
 const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
@@ -245,6 +272,7 @@ export const dbService = {
     candidates: any[],
     clubId?: string | null,
     status: "draft" | "active" | "completed" = "draft",
+    positions: Position[] = [],
   ): Promise<ElectionRow> {
     invalidateDBCache();
     const id = "elec_" + Math.floor(Math.random() * 1000000).toString();
@@ -254,6 +282,7 @@ export const dbService = {
       description: description.trim() || "No description provided.",
       status,
       candidates,
+      positions: positions && positions.length > 0 ? positions : [],
       created_at: new Date().toISOString(),
       published: false,
       club_id: clubId || null,
@@ -450,6 +479,8 @@ export const dbService = {
     voterId: string,
     electionId: string,
     candidate: string,
+    positionId: string = "general",
+    candidateId?: string,
   ): Promise<VoteRow> {
     invalidateDBCache();
     const id = "vote_" + Math.floor(Math.random() * 1000000).toString();
@@ -457,7 +488,9 @@ export const dbService = {
       id,
       voter_id: voterId,
       election_id: electionId,
+      position_id: positionId,
       candidate,
+      candidate_id: candidateId,
       created_at: new Date().toISOString(),
     };
 
@@ -469,7 +502,7 @@ export const dbService = {
         .single();
       if (error) {
         if (error.code === "23505") {
-          throw new Error("You have already cast a vote in this election.");
+          throw new Error("You have already cast a vote for this position in this election.");
         }
         throw error;
       }
@@ -478,13 +511,70 @@ export const dbService = {
 
     const votes = getLocalTable<VoteRow>(VOTES_KEY);
     if (
-      votes.some((v) => v.voter_id === voterId && v.election_id === electionId)
+      votes.some(
+        (v) =>
+          v.voter_id === voterId &&
+          v.election_id === electionId &&
+          (v.position_id || "general") === positionId,
+      )
     ) {
-      throw new Error("You have already cast a vote in this election.");
+      throw new Error("You have already cast a vote for this position in this election.");
     }
     votes.push(newVote);
     saveLocalTable(VOTES_KEY, votes);
     return newVote;
+  },
+
+  async insertVotesBatch(
+    votesToInsert: Array<{
+      voterId: string;
+      electionId: string;
+      candidate: string;
+      positionId: string;
+      candidateId?: string;
+    }>,
+  ): Promise<VoteRow[]> {
+    invalidateDBCache();
+    const newVotes: VoteRow[] = votesToInsert.map((v, i) => ({
+      id: `vote_${Math.floor(Math.random() * 1000000)}_${i}`,
+      voter_id: v.voterId,
+      election_id: v.electionId,
+      position_id: v.positionId,
+      candidate: v.candidate,
+      candidate_id: v.candidateId,
+      created_at: new Date().toISOString(),
+    }));
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from("votes")
+        .insert(newVotes)
+        .select();
+      if (error) {
+        if (error.code === "23505") {
+          throw new Error("You have already cast a vote in one or more positions in this election.");
+        }
+        throw error;
+      }
+      return data || [];
+    }
+
+    const localVotes = getLocalTable<VoteRow>(VOTES_KEY);
+    for (const nv of newVotes) {
+      if (
+        localVotes.some(
+          (v) =>
+            v.voter_id === nv.voter_id &&
+            v.election_id === nv.election_id &&
+            (v.position_id || "general") === (nv.position_id || "general"),
+        )
+      ) {
+        throw new Error("You have already cast a vote for this position.");
+      }
+      localVotes.push(nv);
+    }
+    saveLocalTable(VOTES_KEY, localVotes);
+    return newVotes;
   },
 
   // ELECTION UPDATES FEED
@@ -842,33 +932,39 @@ export const dbService = {
     student: Omit<StudentRow, "id" | "uploaded_at">,
   ): Promise<StudentRow> {
     invalidateDBCache();
-    const id = "stud_" + Math.floor(Math.random() * 1000000).toString();
-    const newStudent: StudentRow = {
-      ...student,
-      id,
-      uploaded_at: new Date().toISOString(),
-    };
 
     if (isSupabaseConfigured && supabase) {
+      const payload = {
+        program_name: student.program_name,
+        academic_year: student.academic_year,
+        registration_number: student.registration_number,
+        cum_number: student.cum_number,
+        surname: student.surname,
+        first_name: student.first_name,
+        gender: student.gender,
+        email: student.email || null,
+        status: student.status || "approved",
+      };
+
       const { data, error } = await supabase
         .from("students")
-        .insert({
-          id: newStudent.id,
-          program_name: newStudent.program_name,
-          academic_year: newStudent.academic_year,
-          registration_number: newStudent.registration_number,
-          cum_number: newStudent.cum_number,
-          surname: newStudent.surname,
-          first_name: newStudent.first_name,
-          gender: newStudent.gender,
-          email: newStudent.email || null,
-          status: newStudent.status || "approved",
-        })
+        .insert(payload)
         .select()
         .single();
       if (error) throw error;
       return data;
     }
+
+    const localId =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : "stud_" + Math.floor(Math.random() * 1000000).toString();
+
+    const newStudent: StudentRow = {
+      ...student,
+      id: localId,
+      uploaded_at: new Date().toISOString(),
+    };
 
     const local = getLocalTable<StudentRow>(STUDENTS_KEY);
     if (
@@ -942,7 +1038,6 @@ export const dbService = {
   ): Promise<void> {
     if (isSupabaseConfigured && supabase) {
       const insertPayload = students.map((s) => ({
-        id: "stud_" + Math.floor(Math.random() * 10000000).toString(),
         program_name: s.program_name,
         academic_year: s.academic_year,
         registration_number: s.registration_number,
@@ -974,7 +1069,10 @@ export const dbService = {
         id:
           idx >= 0
             ? local[idx].id
-            : "stud_" + Math.floor(Math.random() * 1000000).toString(),
+            : typeof crypto !== "undefined" &&
+                typeof crypto.randomUUID === "function"
+              ? crypto.randomUUID()
+              : "stud_" + Math.floor(Math.random() * 1000000).toString(),
         uploaded_at: new Date().toISOString(),
         email: s.email,
         status: s.status || "approved",
@@ -1050,6 +1148,7 @@ CREATE TABLE IF NOT EXISTS elections (
   description TEXT,
   status TEXT DEFAULT 'draft',
   candidates JSONB DEFAULT '[]'::jsonb,
+  positions JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now(),
   published BOOLEAN DEFAULT false,
   published_at TEXT,
@@ -1061,9 +1160,11 @@ CREATE TABLE IF NOT EXISTS votes (
   id TEXT PRIMARY KEY,
   voter_id TEXT REFERENCES voters(id) ON DELETE CASCADE,
   election_id TEXT REFERENCES elections(id) ON DELETE CASCADE,
+  position_id TEXT DEFAULT 'general',
   candidate TEXT NOT NULL,
+  candidate_id TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
-  CONSTRAINT unique_voter_election UNIQUE (voter_id, election_id)
+  CONSTRAINT unique_voter_election_position UNIQUE (voter_id, election_id, position_id)
 );
 
 -- 6. CREATE UPDATES FEED TABLE
@@ -1104,6 +1205,8 @@ CREATE TABLE IF NOT EXISTS students (
   surname TEXT NOT NULL,
   first_name TEXT NOT NULL,
   gender TEXT NOT NULL,
+  email TEXT,
+  status TEXT DEFAULT 'approved',
   uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT students_pkey PRIMARY KEY (id)
 );

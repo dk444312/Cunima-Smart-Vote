@@ -19,6 +19,9 @@ import {
   X,
   AlertCircle,
   ShieldCheck,
+  Award,
+  Copy,
+  Clock,
 } from "lucide-react";
 import {
   LoggedInUser,
@@ -31,15 +34,19 @@ import {
   UpdateLikeRow,
   UpdateCommentRow,
   StudentRow,
+  Position,
+  Candidate,
 } from "../../types.ts";
-import { dbService } from "../../lib/supabase.ts";
+import { dbService, getElectionPositions } from "../../lib/supabase.ts";
 import UpdatesFeed from "../shared/UpdatesFeed.tsx";
 import StudentsManager from "./StudentsManager.tsx";
+import CandidatesManager from "./CandidatesManager.tsx";
 
 interface AdminDashboardProps {
   currentUser: LoggedInUser;
   activeMenu:
     | "election"
+    | "candidates"
     | "voters"
     | "clubs"
     | "results"
@@ -47,10 +54,12 @@ interface AdminDashboardProps {
     | "sql_db"
     | "updates"
     | "students"
-    | "verified";
+    | "verified"
+    | string;
   setActiveMenu: (
     menu:
       | "election"
+      | "candidates"
       | "voters"
       | "clubs"
       | "results"
@@ -58,7 +67,8 @@ interface AdminDashboardProps {
       | "sql_db"
       | "updates"
       | "students"
-      | "verified",
+      | "verified"
+      | string,
   ) => void;
   elections: ElectionRow[];
   votes: VoteRow[];
@@ -85,6 +95,8 @@ interface AdminDashboardProps {
   candidatePhoto: string;
   setCandidatePhoto: (val: string) => void;
   setCandidates: (val: any[]) => void;
+  positions?: Position[];
+  setPositions?: React.Dispatch<React.SetStateAction<Position[]>>;
   handleCreateElection: (e: React.FormEvent) => void;
 
   // Create Voter Form States
@@ -165,6 +177,8 @@ export default function AdminDashboard({
   setCandidates,
   candidatePhoto,
   setCandidatePhoto,
+  positions,
+  setPositions,
   handleCreateElection,
   newVoterUsername,
   setNewVoterUsername,
@@ -204,6 +218,71 @@ export default function AdminDashboard({
   showToast,
   setIsLoading,
 }: AdminDashboardProps) {
+  // Create New Election State & Flow
+  const [showCreateElectionForm, setShowCreateElectionForm] = useState<boolean>(false);
+  const [createElectionTitle, setCreateElectionTitle] = useState<string>("");
+  const [createElectionDesc, setCreateElectionDesc] = useState<string>("");
+  const [createElectionStatus, setCreateElectionStatus] = useState<"draft" | "active">("draft");
+  const [initializeDefaultRoles, setInitializeDefaultRoles] = useState<boolean>(true);
+  const [isSubmittingElection, setIsSubmittingElection] = useState<boolean>(false);
+  const [candidateElectionId, setCandidateElectionId] = useState<string | null>(null);
+  const [copiedMigrationSql, setCopiedMigrationSql] = useState<boolean>(false);
+
+  const handleSaveNewElection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createElectionTitle.trim()) {
+      showToast("Please enter an election title.");
+      return;
+    }
+
+    try {
+      setIsSubmittingElection(true);
+      setIsLoading(true);
+
+      // Initialize with standard executive positions if checked
+      const initialPositions: Position[] = initializeDefaultRoles
+        ? [
+            {
+              id: `pos_${Date.now()}_1`,
+              title: "President",
+              candidates: [],
+            },
+            {
+              id: `pos_${Date.now()}_2`,
+              title: "Vice President",
+              candidates: [],
+            },
+          ]
+        : [];
+
+      const created = await dbService.insertElection(
+        createElectionTitle.trim(),
+        createElectionDesc.trim() || "Official University Election",
+        [],
+        null,
+        createElectionStatus,
+        initialPositions
+      );
+
+      await refreshDatabaseState();
+      showToast(`Election "${created.title}" saved successfully! Proceeding to Candidates menu.`);
+
+      // Reset state
+      setCreateElectionTitle("");
+      setCreateElectionDesc("");
+      setShowCreateElectionForm(false);
+
+      // Set target election for candidates manager and transition immediately
+      setCandidateElectionId(created.id);
+      setActiveMenu("candidates");
+    } catch (err: any) {
+      showToast(`Error creating election: ${err.message}`);
+    } finally {
+      setIsSubmittingElection(false);
+      setIsLoading(false);
+    }
+  };
+
   // Club voter members filter & inline membership management states
   const [voterFilter, setVoterFilter] = useState<"all" | "club" | "non_club">(
     "all",
@@ -253,165 +332,274 @@ export default function AdminDashboard({
 
   return (
     <div className="space-y-6">
+      {/* ================== ADMIN KPIS ================== */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-[#EAF2FF] flex items-center justify-center text-[#1565D8]">
+            <Users2 className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider font-mono">
+              Total Students
+            </span>
+            <div className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+              {students.length}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-[#F1EAFF] flex items-center justify-center text-[#7C3AED]">
+            <Vote className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider font-mono">
+              Active Elections
+            </span>
+            <div className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+              {elections.filter(e => e.status === 'active').length}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-[#E8F8F1] flex items-center justify-center text-[#0E9F6E]">
+            <CheckSquare className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider font-mono">
+              Votes Cast
+            </span>
+            <div className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+              {votes.length}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-[#FFF7E6] flex items-center justify-center text-[#F59E0B]">
+            <Clock className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider font-mono">
+              Pending / Upcoming
+            </span>
+            <div className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+              {elections.filter(e => e.status === 'draft').length}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ================== ELECTION VIEW ================== */}
       {activeMenu === "election" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Create Election Sheet */}
-          <div className="lg:col-span-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4 h-fit">
-            <div>
-              <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 text-base">
-                New Election Sheet
-              </h3>
-              <p className="text-[11px] text-zinc-400">
-                Initialize a custom polling sheet targeted to voters
-              </p>
+        <div className="space-y-4">
+          {/* Quick link banner to the new Candidates menu */}
+          <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#1565D8] text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>Looking to manage candidates & portrait photos?</span>
+                  <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold">New</span>
+                </h4>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  Use the new dedicated <span className="font-semibold text-blue-600 dark:text-blue-400">Candidates</span> menu to effortlessly add positions, candidate names, and portrait photos step-by-step.
+                </p>
+              </div>
             </div>
-
-            <form onSubmit={handleCreateElection} className="space-y-3.5">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-zinc-500">
-                  Election Title
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Student Body President"
-                  value={newElectionTitle}
-                  onChange={(e) => setNewElectionTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:border-blue-500 text-xs text-zinc-900 dark:text-zinc-100"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-zinc-500">
-                  Description
-                </label>
-                <textarea
-                  placeholder="Define context, candidate standards, and key requirements..."
-                  value={newElectionDesc}
-                  onChange={(e) => setNewElectionDesc(e.target.value)}
-                  className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:border-blue-500 text-xs text-zinc-900 dark:text-zinc-100 min-h-12"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-zinc-500">
-                  Candidate Slates
-                </label>
-                <div className="flex flex-col gap-2">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Candidate name"
-                      value={candidateInput}
-                      onChange={(e) => setCandidateInput(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:border-blue-500 text-xs text-zinc-900 dark:text-zinc-100"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const val = candidateInput.trim();
-                        // check if already added by name
-                        const exists = candidates.some(
-                          (c) => (typeof c === "string" ? c : c.name) === val,
-                        );
-                        if (val && !exists) {
-                          if (candidatePhoto) {
-                            setCandidates([
-                              ...candidates,
-                              { name: val, photo_url: candidatePhoto },
-                            ]);
-                          } else {
-                            setCandidates([...candidates, val]);
-                          }
-                          setCandidateInput("");
-                          setCandidatePhoto("");
-                        }
-                      }}
-                      className="px-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-200 rounded-xl cursor-pointer"
-                    >
-                      Add
-                    </button>
-                  </div>
-                  <div className="mt-2">
-                    <LargeFileUploader
-                      onUploadSuccess={(url) => setCandidatePhoto(url)}
-                      label="Candidate Photo"
-                    />
-                    {candidatePhoto && (
-                      <div className="text-[10px] text-emerald-500 mt-1">
-                        Photo attached!
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {candidates.map((cand, idx) => (
-                    <span
-                      key={idx}
-                      className="text-[11px] bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-blue-100 dark:border-blue-900/30"
-                    >
-                      <div className="flex items-center gap-2">
-                        {typeof cand === "object" && cand.photo_url && (
-                          <img
-                            src={cand.photo_url}
-                            className="w-5 h-5 rounded-full object-cover bg-zinc-200"
-                            referrerPolicy="no-referrer"
-                          />
-                        )}
-                        <span>
-                          {typeof cand === "string" ? cand : cand.name}
-                        </span>
-                      </div>
-                      <X
-                        className="w-3 h-3 text-blue-400 hover:text-blue-600 cursor-pointer"
-                        onClick={() =>
-                          setCandidates(candidates.filter((_, i) => i !== idx))
-                        }
-                      />
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer"
-              >
-                Insert Election Row
-              </button>
-            </form>
+            <button
+              type="button"
+              onClick={() => setActiveMenu("candidates")}
+              className="px-4 py-2 bg-[#1565D8] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer whitespace-nowrap self-stretch sm:self-auto text-center flex items-center justify-center gap-1.5"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Go to Candidates Menu →</span>
+            </button>
           </div>
 
-          {/* Active Polls Panel */}
-          <div className="lg:col-span-2 space-y-4">
-            <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
-              <Vote className="w-5 h-5 text-blue-500" />
-              <span>Active Public Ballots</span>
-            </h3>
+          {/* Action Header: Create New Election */}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+                <Vote className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <span>Public Elections & Ballots</span>
+              </h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Manage university-wide general student elections, presidential ballots, and voting statuses
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCreateElectionForm(!showCreateElectionForm)}
+              className="px-4 py-2.5 bg-[#1565D8] hover:bg-blue-900 text-white text-xs font-semibold rounded-xl flex items-center gap-2 cursor-pointer shadow-xs transition-all"
+            >
+              {showCreateElectionForm ? (
+                <>
+                  <X className="w-4 h-4" />
+                  <span>Cancel Creation</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  <span>Create New Election</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Form to Add Election Details (Appears when Create New Election is clicked) */}
+          {showCreateElectionForm && (
+            <div className="bg-white dark:bg-zinc-900 border-2 border-blue-500/60 dark:border-blue-500/40 rounded-2xl p-5 sm:p-6 shadow-md space-y-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-sm">
+                    <Vote className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-50">
+                      New Election Details
+                    </h3>
+                    <p className="text-[11px] text-zinc-400">
+                      Enter election title and guidelines. Once saved, you will immediately proceed to the Candidates menu.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateElectionForm(false)}
+                  className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveNewElection} className="space-y-4">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                      Election Title *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CUNIMA Guild Council Elections 2026"
+                      value={createElectionTitle}
+                      onChange={(e) => setCreateElectionTitle(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:border-blue-500 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
+                      required
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                      Description & Voting Guidelines
+                    </label>
+                    <textarea
+                      placeholder="Official election schedule, accredited faculties, and voting regulations..."
+                      value={createElectionDesc}
+                      onChange={(e) => setCreateElectionDesc(e.target.value)}
+                      rows={3}
+                      className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:border-blue-500 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        Initial Ballot Status
+                      </label>
+                      <select
+                        value={createElectionStatus}
+                        onChange={(e) => setCreateElectionStatus(e.target.value as "draft" | "active")}
+                        className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:border-blue-500 text-xs text-zinc-900 dark:text-zinc-100 cursor-pointer"
+                      >
+                        <option value="draft">Draft (Setup mode — hidden from general voters)</option>
+                        <option value="active">Active (Published & open for voting)</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-6">
+                      <input
+                        type="checkbox"
+                        id="initDefaultRolesCheck"
+                        checked={initializeDefaultRoles}
+                        onChange={(e) => setInitializeDefaultRoles(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                      />
+                      <label htmlFor="initDefaultRolesCheck" className="text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
+                        Pre-populate standard executive roles (President, Vice President)
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateElectionForm(false)}
+                    className="px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingElection || !createElectionTitle.trim()}
+                    className="px-5 py-2.5 bg-[#1565D8] hover:bg-blue-900 disabled:opacity-50 text-white font-semibold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Save Election & Proceed to Candidates Menu →</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Active Public Ballots List */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+                <Vote className="w-4 h-4 text-blue-500" />
+                <span>Active Public Ballots ({elections.filter((e) => !e.club_id).length})</span>
+              </h3>
+            </div>
 
             {elections.filter((e) => !e.club_id).length === 0 ? (
-              <div className="p-12 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm">
+              <div className="p-12 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm space-y-3">
+                <Vote className="w-8 h-8 text-zinc-400 mx-auto" />
                 <p className="text-xs text-zinc-500">
                   No public elections have been initialized yet.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateElectionForm(true)}
+                  className="px-4 py-2 bg-[#1565D8] hover:bg-blue-900 text-white text-xs font-semibold rounded-xl cursor-pointer"
+                >
+                  Create First Election
+                </button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
                 {elections
                   .filter((e) => !e.club_id)
                   .map((election) => {
                     const votesCount = votes.filter(
                       (v) => v.election_id === election.id,
                     ).length;
+                    const electionPositions = getElectionPositions(election);
+                    const totalCandidates = electionPositions.reduce(
+                      (acc, p) => acc + p.candidates.length,
+                      0,
+                    );
 
                     return (
                       <div
                         key={election.id}
                         className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4"
                       >
-                        <div className="flex justify-between items-start">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                           <div>
                             <h4 className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
                               {election.title}
@@ -421,20 +609,22 @@ export default function AdminDashboard({
                             </p>
                           </div>
 
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${
-                              election.status === "active"
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                : election.status === "completed"
-                                  ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
-                                  : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300"
-                            }`}
-                          >
-                            {election.status.toUpperCase()}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold ${
+                                election.status === "active"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                  : election.status === "completed"
+                                    ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
+                                    : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300"
+                              }`}
+                            >
+                              {election.status.toUpperCase()}
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs bg-zinc-50 dark:bg-zinc-800/20 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/40 font-mono">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-zinc-50 dark:bg-zinc-800/20 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/40 font-mono">
                           <div>
                             <div className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
                               Poll Status
@@ -481,7 +671,16 @@ export default function AdminDashboard({
 
                           <div>
                             <div className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
-                              Ballots cast
+                              Positions
+                            </div>
+                            <div className="font-semibold text-zinc-700 dark:text-zinc-200 mt-0.5">
+                              {electionPositions.length} roles ({totalCandidates} candidates)
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
+                              Ballots Cast
                             </div>
                             <div className="font-semibold text-zinc-700 dark:text-zinc-200 mt-0.5">
                               {votesCount} votes
@@ -489,23 +688,85 @@ export default function AdminDashboard({
                           </div>
                         </div>
 
+                        {/* Positions & Candidates Portfolio Summary */}
+                        <div className="space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                          <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                            Positions & Candidate Portfolios ({electionPositions.length}):
+                          </div>
+                          {electionPositions.length === 0 ? (
+                            <p className="text-xs text-zinc-400 italic">
+                              No positions created yet. Click "Manage Candidates" below to add positions and candidates.
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {electionPositions.map((pos) => (
+                                <div
+                                  key={pos.id}
+                                  className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-700/60 space-y-1.5"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                                      {pos.title}
+                                    </span>
+                                    <span className="text-[10px] bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.2 rounded-full font-mono text-zinc-600 dark:text-zinc-300">
+                                      {pos.candidates.length} candidates
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {pos.candidates.map((cand) => (
+                                      <div
+                                        key={cand.id}
+                                        className="flex items-center gap-1.5 bg-white dark:bg-zinc-900 px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 text-[11px] shadow-2xs"
+                                      >
+                                        {cand.photo_url ? (
+                                          <img
+                                            src={cand.photo_url}
+                                            alt={cand.name}
+                                            className="w-4 h-4 rounded-full object-cover border border-zinc-200"
+                                            referrerPolicy="no-referrer"
+                                          />
+                                        ) : (
+                                          <div className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold text-[9px] flex items-center justify-center">
+                                            {cand.name.charAt(0)}
+                                          </div>
+                                        )}
+                                        <span className="font-medium text-zinc-700 dark:text-zinc-300 truncate max-w-[110px]">
+                                          {cand.name}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    {pos.candidates.length === 0 && (
+                                      <span className="text-[10px] text-zinc-400 italic">No candidates</span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                          <div className="flex gap-1 flex-wrap">
-                            {election.candidates.map((cand, idx) => (
-                              <span
-                                key={idx}
-                                className="text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2.5 py-0.5 rounded-full border border-zinc-200/50 dark:border-zinc-700"
-                              >
-                                {typeof cand === "string" ? cand : cand.name}
-                              </span>
-                            ))}
+                          <div className="text-[11px] text-zinc-400 font-mono">
+                            ID: {election.id.slice(0, 8)}...
                           </div>
 
                           <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCandidateElectionId(election.id);
+                                setActiveMenu("candidates");
+                              }}
+                              className="px-3.5 py-1.5 bg-[#1565D8] hover:bg-blue-900 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                              title="Manage candidate portfolios and positions"
+                            >
+                              <Users className="w-3.5 h-3.5" />
+                              <span>Manage Candidates</span>
+                            </button>
                             {election.status !== "completed" && (
                               <button
                                 onClick={() => simulateVotes(election.id)}
-                                className="px-3 py-1 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer border border-blue-100 dark:border-blue-900/40"
+                                className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer border border-blue-100 dark:border-blue-900/40"
                                 title="Distribute random ballots among active voters"
                               >
                                 <Sparkles className="w-3.5 h-3.5 animate-pulse" />
@@ -528,6 +789,19 @@ export default function AdminDashboard({
             )}
           </div>
         </div>
+      )}
+
+      {/* ================== CANDIDATES MANAGEMENT VIEW ================== */}
+      {activeMenu === "candidates" && (
+        <CandidatesManager
+          elections={elections}
+          onRefresh={refreshDatabaseState}
+          showToast={showToast}
+          setIsLoading={setIsLoading}
+          setActiveMenu={setActiveMenu}
+          initialElectionId={candidateElectionId || undefined}
+          onClearInitialElectionId={() => setCandidateElectionId(null)}
+        />
       )}
 
       {/* ================== VOTERS VIEW ================== */}
@@ -927,7 +1201,7 @@ export default function AdminDashboard({
 
               <button
                 type="submit"
-                className="w-full py-2 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer"
+                className="w-full py-2 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-xs rounded-full transition-colors cursor-pointer"
               >
                 Create Club Page
               </button>
@@ -1005,7 +1279,7 @@ export default function AdminDashboard({
                             }
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
                               isManaging
-                                ? "bg-[#0B1E40] text-white"
+                                ? "bg-[#1565D8] text-white"
                                 : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200"
                             }`}
                           >
@@ -1141,86 +1415,127 @@ export default function AdminDashboard({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {elections.map((election) => {
-              const resultsMap = votes
-                .filter((v) => v.election_id === election.id)
-                .reduce<Record<string, number>>((acc, curr) => {
-                  acc[curr.candidate] = (acc[curr.candidate] || 0) + 1;
-                  return acc;
-                }, {});
-
-              const totalVotes = (Object.values(resultsMap) as number[]).reduce(
-                (a, b) => a + b,
-                0,
-              );
+              const electionPositions = getElectionPositions(election);
+              const electionVotes = votes.filter((v) => v.election_id === election.id);
+              const totalVotes = electionVotes.length;
 
               return (
                 <div
                   key={election.id}
-                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm"
+                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between"
                 >
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h4 className="font-semibold text-zinc-950 dark:text-zinc-50 text-base flex items-center gap-2">
-                        <span>{election.title}</span>
-                        {election.club_id && (
-                          <span className="text-[10px] bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 px-2.5 py-0.5 rounded-full font-bold">
-                            Club Poll
-                          </span>
-                        )}
-                      </h4>
-                      <span className="text-[10px] font-mono text-zinc-400">
-                        Total votes: {totalVotes}
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="font-semibold text-zinc-950 dark:text-zinc-50 text-base flex items-center gap-2">
+                          <span>{election.title}</span>
+                          {election.club_id && (
+                            <span className="text-[10px] bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 px-2.5 py-0.5 rounded-full font-bold">
+                              Club Poll
+                            </span>
+                          )}
+                        </h4>
+                        <span className="text-[10px] font-mono text-zinc-400">
+                          Total ballots submitted: {totalVotes} | Positions: {electionPositions.length}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${
+                          election.published
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800/40 dark:text-zinc-400"
+                        }`}
+                      >
+                        {election.published ? "Published" : "Hidden"}
                       </span>
                     </div>
-                    <span
-                      className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${
-                        election.published
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
-                          : "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800/40 dark:text-zinc-400"
-                      }`}
-                    >
-                      {election.published ? "Published" : "Hidden"}
-                    </span>
-                  </div>
 
-                  <div className="space-y-2 mb-6">
-                    {election.candidates.map((cand, idx) => {
-                      const count =
-                        resultsMap[
-                          typeof cand === "string" ? cand : cand.name
-                        ] || 0;
-                      const pct =
-                        totalVotes > 0
-                          ? Math.round((count / totalVotes) * 100)
-                          : 0;
-                      return (
-                        <div key={idx} className="space-y-1">
-                          <div className="flex justify-between text-xs font-semibold">
-                            <div className="flex items-center gap-2">
-                              {typeof cand === "object" && cand.photo_url && (
-                                <img
-                                  src={cand.photo_url}
-                                  className="w-5 h-5 rounded-full object-cover bg-zinc-200"
-                                  referrerPolicy="no-referrer"
-                                />
-                              )}
-                              <span>
-                                {typeof cand === "string" ? cand : cand.name}
+                    {/* Grouped by Electoral Position */}
+                    <div className="space-y-4 mb-6">
+                      {electionPositions.map((pos) => {
+                        // Get votes for this position or fallback to matching candidate names
+                        const posVotes = electionVotes.filter(
+                          (v) => (v.position_id && v.position_id === pos.id) || pos.candidates.some((c) => c.name === v.candidate)
+                        );
+                        const posTotal = posVotes.length;
+
+                        // Tally votes per candidate
+                        const candCounts = pos.candidates.map((cand) => {
+                          const count = posVotes.filter(
+                            (v) => (v.candidate_id && v.candidate_id === cand.id) || v.candidate === cand.name
+                          ).length;
+                          return {
+                            cand,
+                            count,
+                            pct: posTotal > 0 ? Math.round((count / posTotal) * 100) : 0,
+                          };
+                        });
+
+                        const maxVotes = Math.max(0, ...candCounts.map((c) => c.count));
+
+                        return (
+                          <div
+                            key={pos.id}
+                            className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 space-y-2.5"
+                          >
+                            <div className="flex items-center justify-between border-b border-zinc-200/50 dark:border-zinc-700/50 pb-1.5">
+                              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                                <Award className="w-3.5 h-3.5 text-blue-600" />
+                                <span>{pos.title}</span>
+                              </span>
+                              <span className="text-[10px] font-mono text-zinc-500">
+                                {posTotal} votes cast
                               </span>
                             </div>
-                            <span className="font-mono text-zinc-500">
-                              {count} votes ({pct}%)
-                            </span>
+
+                            <div className="space-y-2">
+                              {candCounts.map(({ cand, count, pct }) => {
+                                const isLeader = maxVotes > 0 && count === maxVotes;
+                                return (
+                                  <div key={cand.id} className="space-y-1">
+                                    <div className="flex justify-between text-xs font-semibold">
+                                      <div className="flex items-center gap-2">
+                                        {cand.photo_url ? (
+                                          <img
+                                            src={cand.photo_url}
+                                            alt={cand.name}
+                                            className="w-5 h-5 rounded-full object-cover border border-zinc-200"
+                                            referrerPolicy="no-referrer"
+                                          />
+                                        ) : (
+                                          <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold text-[9px] flex items-center justify-center">
+                                            {cand.name.charAt(0)}
+                                          </div>
+                                        )}
+                                        <span className="text-zinc-800 dark:text-zinc-200">
+                                          {cand.name}
+                                        </span>
+                                        {isLeader && (
+                                          <span className="text-[9px] bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.2 rounded font-bold">
+                                            Leading
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="font-mono text-zinc-500 text-[11px]">
+                                        {count} votes ({pct}%)
+                                      </span>
+                                    </div>
+                                    <div className="h-2 bg-zinc-200/70 dark:bg-zinc-700 rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full transition-all duration-500 ${
+                                          isLeader ? "bg-[#1565D8] dark:bg-blue-500" : "bg-zinc-400 dark:bg-zinc-600"
+                                        }`}
+                                        style={{ width: `${pct}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                          <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-[#0B1E40] rounded-full"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <div className="flex justify-end pt-3 border-t border-zinc-100 dark:border-zinc-800">
@@ -1231,7 +1546,7 @@ export default function AdminDashboard({
                       className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                         election.published
                           ? "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200"
-                          : "bg-[#0B1E40] hover:bg-blue-900 text-white border-blue-500"
+                          : "bg-[#1565D8] hover:bg-blue-900 text-white border-blue-500"
                       }`}
                     >
                       {election.published
@@ -1334,7 +1649,7 @@ export default function AdminDashboard({
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full py-2.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
+                className="w-full py-2.5 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-sm rounded-full transition-colors cursor-pointer"
               >
                 Update Credentials
               </button>
@@ -1561,6 +1876,61 @@ export default function AdminDashboard({
             </button>
           </div>
 
+          {/* Supabase SQL Migration Helper */}
+          <div className="p-4 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/50 rounded-2xl space-y-3 font-sans">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-purple-950 dark:text-purple-200 flex items-center gap-2">
+                  <Database className="w-4 h-4 text-purple-600" />
+                  <span>Supabase SQL Migration for Positions & Candidate Photos</span>
+                </h3>
+                <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
+                  Run this SQL in your Supabase project SQL Editor to enable multiple positions, candidate photos, and per-position voting without any database errors.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const sql = `-- 1. Add positions JSONB column to elections
+ALTER TABLE elections ADD COLUMN IF NOT EXISTS positions JSONB DEFAULT '[]'::jsonb;
+
+-- 2. Add position_id and candidate_id columns to votes
+ALTER TABLE votes ADD COLUMN IF NOT EXISTS position_id TEXT DEFAULT 'general';
+ALTER TABLE votes ADD COLUMN IF NOT EXISTS candidate_id TEXT;
+
+-- 3. Set existing votes default position
+UPDATE votes SET position_id = 'general' WHERE position_id IS NULL;
+
+-- 4. Update the unique constraint on votes to allow voting per position
+ALTER TABLE votes DROP CONSTRAINT IF EXISTS unique_voter_election;
+ALTER TABLE votes DROP CONSTRAINT IF EXISTS unique_voter_election_position;
+
+ALTER TABLE votes ADD CONSTRAINT unique_voter_election_position 
+  UNIQUE (voter_id, election_id, position_id);`;
+                  navigator.clipboard.writeText(sql);
+                  setCopiedMigrationSql(true);
+                  setTimeout(() => setCopiedMigrationSql(false), 2500);
+                  showToast("SQL migration script copied to clipboard!");
+                }}
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-sm"
+              >
+                {copiedMigrationSql ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedMigrationSql ? "Copied SQL!" : "Copy SQL Migration"}</span>
+              </button>
+            </div>
+
+            <pre className="p-3 bg-purple-900/10 dark:bg-purple-950/60 rounded-xl text-[11px] font-mono text-purple-950 dark:text-purple-200 overflow-x-auto border border-purple-200/60 dark:border-purple-900/40">
+{`-- Add positions & candidate photos support
+ALTER TABLE elections ADD COLUMN IF NOT EXISTS positions JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE votes ADD COLUMN IF NOT EXISTS position_id TEXT DEFAULT 'general';
+ALTER TABLE votes ADD COLUMN IF NOT EXISTS candidate_id TEXT;
+UPDATE votes SET position_id = 'general' WHERE position_id IS NULL;
+ALTER TABLE votes DROP CONSTRAINT IF EXISTS unique_voter_election;
+ALTER TABLE votes DROP CONSTRAINT IF EXISTS unique_voter_election_position;
+ALTER TABLE votes ADD CONSTRAINT unique_voter_election_position UNIQUE (voter_id, election_id, position_id);`}
+            </pre>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono">
             {/* ELECTIONS TABLE */}
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-3 shadow-sm">
@@ -1590,7 +1960,12 @@ export default function AdminDashboard({
                         club_id: {e.club_id}
                       </div>
                     )}
-                    <div className="text-[10px] text-zinc-400">
+                    {e.positions && e.positions.length > 0 && (
+                      <div className="text-[10px] text-purple-600 dark:text-purple-400">
+                        Positions: {e.positions.length} configured
+                      </div>
+                    )}
+                    <div className="text-[10px] text-zinc-400 truncate">
                       Candidates: {JSON.stringify(e.candidates)}
                     </div>
                   </div>
