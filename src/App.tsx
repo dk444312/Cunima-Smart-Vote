@@ -440,7 +440,7 @@ export default function App() {
           return;
         }
 
-        // Check if student profile is connected in Socrates student directory!
+        // Check if student profile is connected in CampusVote student directory!
         const matchedStudent = findMatchingStudent(
           matchedVoter.username,
           students,
@@ -560,7 +560,7 @@ export default function App() {
       setIsSearchingProfile(true);
       setCurrentUserDisplay(displayName);
       setSearchStateMessage(
-        "Establishing secure connection to Socrates Database...",
+        "Establishing secure connection to CampusVote Database...",
       );
       await new Promise((resolve) => setTimeout(resolve, 700));
 
@@ -1467,7 +1467,7 @@ export default function App() {
                     Confirm Your Identity
                   </h2>
                   <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                    Socrates matching engine found the following student profile
+                    CampusVote matching engine found the following student profile
                     connected to your Google credentials. Please verify details
                     before exploring the portal.
                   </p>
@@ -1574,7 +1574,7 @@ export default function App() {
                         );
                         setPendingIdentityConfirm(null);
                         showToast(
-                          "Identity Confirmed: Welcome to Socrates Campus Portal.",
+                          "Identity Confirmed: Welcome to CampusVote Campus Portal.",
                         );
                       }
                     }}
@@ -1619,7 +1619,7 @@ export default function App() {
                         setActiveGuardLockUser(null);
                         setGuardLockPasswordInput("");
                         showToast(
-                          "Guard Lock Passed: Welcome to Socrates Campus Portal.",
+                          "Guard Lock Passed: Welcome to CampusVote Campus Portal.",
                         );
                       } else {
                         showToast(
@@ -1729,7 +1729,7 @@ export default function App() {
                 </div>
 
                 <div className="text-[10px] text-zinc-400 font-mono">
-                  Socrates Intelligent Verification Engine v1.2
+                  CampusVote Intelligent Verification Engine v1.2
                 </div>
               </div>
             ) : (
@@ -2947,7 +2947,7 @@ export default function App() {
                     CUNIMA Student Democracy
                   </p>
                   <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
-                    Official voting portal powered by Socrates Engine
+                    Official voting portal powered by CampusVote Engine
                   </p>
                 </div>
               </div>
