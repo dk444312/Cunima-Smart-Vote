@@ -92,6 +92,7 @@ export default function App() {
   >({});
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showOctopasSplash, setShowOctopasSplash] = useState(false);
 
   // Student Registration Form States (Google or Username/Password Auth)
   const [pendingGoogleUser, setPendingGoogleUser] = useState<{
@@ -238,6 +239,14 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       await initializeDatabase();
+      const hasSeenSplash = localStorage.getItem("has_seen_octopas_splash");
+      if (!hasSeenSplash) {
+        setShowOctopasSplash(true);
+        // Show Octopas splash screen for 3 seconds first
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        setShowOctopasSplash(false);
+        localStorage.setItem("has_seen_octopas_splash", "true");
+      }
       await refreshDatabaseState();
     };
     init();
@@ -482,12 +491,12 @@ export default function App() {
         showToast(`Access Granted: Welcome back, ${voterUser.username}.`);
       } else {
         setLoginError(
-          "Incorrect password. Please verify your credentials sheet.",
+          "Incorrect credentials. Please login with Google or contact the Electoral Commission for support.",
         );
       }
     } else {
       setLoginError(
-        `Account "${user}" is not in the database. If you are a student, submit your registration details below.`,
+        "Incorrect credentials. Please login with Google or contact the Electoral Commission for support.",
       );
       setUnregisteredUsernamePrompt(user);
     }
@@ -2979,8 +2988,25 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* OCTOPAS FIRST TIME WELCOME SPLASH SCREEN */}
+      {showOctopasSplash && (
+        <div className="fixed inset-0 z-[110] bg-white dark:bg-zinc-950 flex flex-col items-center justify-center p-6 select-none animate-fadeIn">
+          <div className="relative w-64 h-64 flex items-center justify-center animate-[pulse_2s_infinite]">
+            <img
+              src="/images/Octopas.png"
+              alt="Octopas Logo"
+              className="w-full h-full object-contain"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <div className="mt-8 text-sm font-black tracking-widest text-zinc-400 dark:text-zinc-600 uppercase font-sans animate-pulse">
+            CampusVote Ecosystem
+          </div>
+        </div>
+      )}
+
       {/* GLOBAL FULL SCREEN LOADER */}
-      {isLoading && (
+      {isLoading && !showOctopasSplash && (
         <div className="fixed inset-0 z-[100] bg-white dark:bg-zinc-950 backdrop-blur-md flex flex-col items-center justify-center p-6 select-none cursor-wait text-center">
           <div className="relative w-44 h-44 flex items-center justify-center animate-[pulse_1.5s_infinite] mb-2">
             <img
