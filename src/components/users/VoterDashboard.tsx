@@ -15,6 +15,7 @@ import {
   Users2,
   KeyRound,
   ChevronRight,
+  Search,
 } from "lucide-react";
 import {
   LoggedInUser,
@@ -114,6 +115,19 @@ export default function VoterDashboard({
   const [subCum, setSubCum] = useState("");
   const [subGender, setSubGender] = useState("M");
 
+  // Edit profile modal state
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editSurname, setEditSurname] = useState("");
+  const [editProgram, setEditProgram] = useState("");
+  const [editYear, setEditYear] = useState("");
+  const [editCum, setEditCum] = useState("");
+  const [editGender, setEditGender] = useState("M");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Search query for favorite candidates in election voting portal
+  const [voterSearchQueries, setVoterSearchQueries] = useState<Record<string, string>>({});
+
   const normUser = currentUser.username.trim().toLowerCase();
   const linkedStudent = students.find((s) => {
     const sEmail = s.email ? s.email.trim().toLowerCase() : "";
@@ -164,6 +178,46 @@ export default function VoterDashboard({
     }
   };
 
+  const handleOpenEditProfile = (student: StudentRow) => {
+    setEditFirstName(student.first_name);
+    setEditSurname(student.surname);
+    setEditProgram(student.program_name);
+    setEditYear(student.academic_year);
+    setEditCum(student.cum_number);
+    setEditGender(student.gender || "M");
+    setIsEditProfileModalOpen(true);
+  };
+
+  const handleSaveEditedProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkedStudent) return;
+    if (!editFirstName.trim() || !editSurname.trim() || !editProgram.trim() || !editYear.trim() || !editCum.trim()) {
+      showToast("Please fill in all fields.");
+      return;
+    }
+
+    try {
+      setIsSavingProfile(true);
+      setIsLoading(true);
+      await dbService.updateStudentProfile(linkedStudent.id, {
+        first_name: editFirstName.trim(),
+        surname: editSurname.trim(),
+        program_name: editProgram.trim(),
+        academic_year: editYear.trim(),
+        gender: editGender.trim(),
+        cum_number: editCum.trim(),
+      });
+      await refreshDatabaseState();
+      setIsEditProfileModalOpen(false);
+      showToast("Profile updated successfully!");
+    } catch (err: any) {
+      showToast(`Error updating profile: ${err.message}`);
+    } finally {
+      setIsSavingProfile(false);
+      setIsLoading(false);
+    }
+  };
+
   const handleCastVote = async (
     electionId: string,
     positionId: string,
@@ -187,6 +241,52 @@ export default function VoterDashboard({
       );
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message || "Could not cast your vote."}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCastBulkBallot = async (
+    electionId: string,
+    electionPositions: any[],
+  ) => {
+    // Collect all selections for this election
+    const ballotVotes: Array<{ positionId: string; candidateName: string; candidateId?: string }> = [];
+    for (const pos of electionPositions) {
+      const selectionKey = `${electionId}_${pos.id}`;
+      const selection = selectedCandidates[selectionKey];
+      if (selection && selection.candidateName) {
+        ballotVotes.push({
+          positionId: pos.id,
+          candidateName: selection.candidateName,
+          candidateId: selection.candidateId,
+        });
+      }
+    }
+
+    if (ballotVotes.length === 0) {
+      showToast("Please make at least one candidate selection before submitting your ballot.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      // Cast all votes
+      for (const voteItem of ballotVotes) {
+        await dbService.insertVote(
+          currentUser.id,
+          electionId,
+          voteItem.candidateName,
+          voteItem.positionId,
+          voteItem.candidateId,
+        );
+      }
+      await refreshDatabaseState();
+      showToast(
+        `BALLOT SUCCESS: Your official ballot of ${ballotVotes.length} selection(s) has been securely submitted!`,
+      );
+    } catch (err: any) {
+      showToast(`SQL ERROR: ${err.message || "Could not cast your bulk ballot."}`);
     } finally {
       setIsLoading(false);
     }
@@ -722,13 +822,32 @@ export default function VoterDashboard({
                         Voting open
                       </div>
                       
-                      <div className="mt-6 border-t border-[#E4E7EC] dark:border-zinc-800 pt-4">
+                      <div className="mt-6 border-t border-[#E4E7EC] dark:border-zinc-800 pt-5">
+                        {!allPositionsVoted && (
+                          <div className="relative mb-5">
+                            <Search className="absolute left-3.5 top-3 w-4 h-4 text-zinc-400 pointer-events-none" />
+                            <input
+                              type="text"
+                              placeholder="Search your favorite candidate by name..."
+                              value={voterSearchQueries[election.id] || ""}
+                              onChange={(e) => {
+                                setVoterSearchQueries((prev) => ({
+                                  ...prev,
+                                  [election.id]: e.target.value,
+                                }));
+                              }}
+                              className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:border-[#1565D8] focus:ring-1 focus:ring-[#1565D8] focus:outline-none text-xs text-zinc-950 dark:text-zinc-100 placeholder-zinc-400"
+                            />
+                          </div>
+                        )}
+
                         {allPositionsVoted ? (
-                           <div className="w-full py-3 bg-[#0E9F6E] text-white text-center font-semibold text-sm rounded-[10px] flex items-center justify-center gap-2">
-                             <Check className="w-4 h-4" /> Voted
+                           <div className="w-full py-4 bg-[#E8F8F1] dark:bg-emerald-950/20 border border-[#0E9F6E]/30 text-[#0E9F6E] dark:text-emerald-400 text-center font-bold text-sm rounded-2xl flex items-center justify-center gap-2">
+                             <Check className="w-5 h-5 font-black" />
+                             <span>Official Ballot Submitted & Verified</span>
                            </div>
                         ) : (
-                          <div className="flex flex-col gap-4">
+                          <div className="space-y-8">
                              {electionPositions.map((pos) => {
                                const existingVote = userVotesInElection.find(
                                  (v) =>
@@ -740,91 +859,124 @@ export default function VoterDashboard({
                                );
                                const selectionKey = `${election.id}_${pos.id}`;
                                const currentSelection = selectedCandidates[selectionKey];
+                               const searchQuery = (voterSearchQueries[election.id] || "").trim().toLowerCase();
+                               const filteredCandidates = pos.candidates.filter((cand) =>
+                                 !searchQuery || cand.name.toLowerCase().includes(searchQuery)
+                               );
 
                                return (
-                                 <div key={pos.id} className="space-y-3">
-                                   <div className="flex items-center justify-between">
-                                      <span className="font-semibold text-sm text-[#172033] dark:text-zinc-100 font-['Poppins']">
+                                 <div key={pos.id} className="space-y-4">
+                                   <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                                      <span className="font-bold text-base text-[#0B2D6B] dark:text-blue-300 font-['Poppins']">
                                         {pos.title}
                                       </span>
                                       {existingVote && (
-                                        <span className="text-[11px] text-[#0E9F6E] font-semibold bg-[#E8F8F1] dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
-                                          Voted
+                                        <span className="text-xs text-[#0E9F6E] font-bold bg-[#E8F8F1] dark:bg-emerald-950/40 px-3 py-1 rounded-full flex items-center gap-1">
+                                          <Check className="w-3.5 h-3.5" /> Voted
                                         </span>
                                       )}
                                    </div>
                                    {existingVote ? (
-                                      <div className="p-3 bg-[#E8F8F1] dark:bg-emerald-950/20 border border-[#0E9F6E]/20 rounded-xl text-sm font-['Montserrat']">
-                                        You voted for <strong className="text-[#0E9F6E]">{existingVote.candidate}</strong>
+                                      <div className="p-4 bg-[#E8F8F1] dark:bg-emerald-950/20 border border-[#0E9F6E]/20 rounded-2xl text-sm font-semibold text-zinc-800 dark:text-zinc-200 font-['Montserrat'] flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-[#0E9F6E]" />
+                                        <span>You cast your official vote for <strong className="text-[#0E9F6E]">{existingVote.candidate}</strong></span>
                                       </div>
                                    ) : (
-                                     <div className="space-y-2">
-                                        {pos.candidates.map((cand) => (
-                                          <label
-                                            key={cand.id}
-                                            className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
-                                              currentSelection?.candidateName === cand.name
-                                                ? "bg-[#EAF2FF] border-[#1565D8] dark:bg-blue-950/40 text-[#0B2D6B] dark:text-blue-200"
-                                                : "bg-white dark:bg-zinc-900 border-[#E4E7EC] dark:border-zinc-700 hover:bg-[#F6F8FC] dark:hover:bg-zinc-800"
-                                            }`}
-                                          >
-                                            <div className="flex items-center gap-3">
-                                              <input
-                                                type="radio"
-                                                name={`pos_${selectionKey}`}
-                                                value={cand.name}
-                                                checked={currentSelection?.candidateName === cand.name}
-                                                onChange={() =>
+                                     <div className="space-y-3">
+                                        {filteredCandidates.length === 0 ? (
+                                          <p className="text-xs text-zinc-400 italic">
+                                            No candidates in this position match your search.
+                                          </p>
+                                        ) : (
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                            {filteredCandidates.map((cand) => (
+                                              <div
+                                                key={cand.id}
+                                                onClick={() => {
                                                   setSelectedCandidates((prev) => ({
                                                     ...prev,
                                                     [selectionKey]: {
                                                       candidateName: cand.name,
                                                       candidateId: cand.id,
                                                     },
-                                                  }))
-                                                }
-                                                className="w-4 h-4 text-[#1565D8] border-gray-300 focus:ring-[#1565D8] cursor-pointer"
-                                              />
-                                              {cand.photo_url ? (
-                                                <img
-                                                  src={cand.photo_url}
-                                                  alt={cand.name}
-                                                  className="w-7 h-7 rounded-full object-cover border border-zinc-200 dark:border-zinc-700"
-                                                  referrerPolicy="no-referrer"
-                                                />
-                                              ) : (
-                                                <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold text-xs flex items-center justify-center">
-                                                  {cand.name.charAt(0).toUpperCase()}
+                                                  }));
+                                                }}
+                                                className={`relative rounded-3xl border overflow-hidden transition-all duration-200 cursor-pointer flex flex-col ${
+                                                  currentSelection?.candidateName === cand.name
+                                                    ? "bg-blue-50/50 dark:bg-blue-950/20 border-[#1565D8] ring-2 ring-[#1565D8]/50 shadow-md scale-[1.01]"
+                                                    : "bg-white dark:bg-zinc-900 border-[#E4E7EC] dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 shadow-xs hover:shadow-sm"
+                                                }`}
+                                              >
+                                                <div className="relative aspect-square w-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
+                                                  {cand.photo_url ? (
+                                                    <img
+                                                      src={cand.photo_url}
+                                                      alt={cand.name}
+                                                      className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                                                      referrerPolicy="no-referrer"
+                                                    />
+                                                  ) : (
+                                                    <div className="w-full h-full bg-gradient-to-br from-blue-50 to-blue-100 dark:from-zinc-800 dark:to-zinc-950 text-blue-700 dark:text-blue-300 font-extrabold text-5xl flex items-center justify-center">
+                                                      {cand.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                  )}
+                                                  
+                                                  <div className="absolute top-3 left-3">
+                                                    <span className="text-[9px] font-extrabold uppercase tracking-widest bg-[#0B1E40] text-white px-2.5 py-1 rounded-md shadow-sm">
+                                                      {pos.title}
+                                                    </span>
+                                                  </div>
+
+                                                  <div className="absolute top-3 right-3">
+                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                      currentSelection?.candidateName === cand.name
+                                                        ? "bg-[#1565D8] border-[#1565D8] text-white scale-110"
+                                                        : "bg-white/90 dark:bg-zinc-900/90 border-zinc-300 dark:border-zinc-600 text-transparent"
+                                                    }`}>
+                                                      <Check className="w-3.5 h-3.5 font-extrabold" />
+                                                    </div>
+                                                  </div>
                                                 </div>
-                                              )}
-                                              <span className="font-medium text-sm text-[#172033] dark:text-zinc-100 font-['Montserrat']">
-                                                {cand.name}
-                                              </span>
-                                            </div>
-                                          </label>
-                                        ))}
-                                        {pos.candidates.length > 0 && (
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              handleCastVote(
-                                                election.id,
-                                                pos.id,
-                                                currentSelection?.candidateName || "",
-                                                currentSelection?.candidateId,
-                                              )
-                                            }
-                                            disabled={!currentSelection?.candidateName}
-                                            className="w-full py-2.5 mt-2 bg-[#1565D8] hover:bg-[#0D5BE1] disabled:bg-[#E4E7EC] disabled:text-[#98A2B3] text-white font-semibold text-sm rounded-[10px] transition-colors cursor-pointer"
-                                          >
-                                            Submit Vote
-                                          </button>
+
+                                                <div className="p-4 flex-grow flex flex-col justify-between space-y-2">
+                                                  <div>
+                                                    <h5 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 leading-tight">
+                                                      {cand.name}
+                                                    </h5>
+                                                    {cand.manifesto ? (
+                                                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 italic line-clamp-2 mt-1.5 leading-normal">
+                                                        "${cand.manifesto}"
+                                                      </p>
+                                                    ) : (
+                                                      <p className="text-[10px] text-zinc-400 italic mt-1">
+                                                        No manifesto statement submitted.
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
                                         )}
                                      </div>
                                    )}
                                  </div>
                                );
                              })}
+
+                             <div className="pt-6 border-t border-[#E4E7EC] dark:border-zinc-800">
+                               <button
+                                 type="button"
+                                 onClick={() => handleCastBulkBallot(election.id, electionPositions)}
+                                 className="w-full py-3.5 bg-[#1565D8] hover:bg-[#0D5BE1] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-blue-500/10 cursor-pointer flex items-center justify-center gap-2"
+                               >
+                                 <Vote className="w-4 h-4" />
+                                 <span>Submit Official Ballot</span>
+                               </button>
+                               <p className="text-[10px] text-center text-zinc-400 mt-2">
+                                 Your selections will be permanently locked and submitted securely to the verified election records.
+                               </p>
+                             </div>
                           </div>
                         )}
                       </div>
@@ -1176,6 +1328,16 @@ export default function VoterDashboard({
                   <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 p-3 rounded-xl border border-blue-100 dark:border-blue-900/30 text-[11px] font-semibold">
                     <ShieldCheck className="w-4 h-4 flex-shrink-0 text-[#1565D8] dark:text-blue-400" />
                     <span>ELIGIBILITY: REGISTERED VOTER APPROVED</span>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditProfile(linkedStudent)}
+                      className="w-full py-2.5 bg-[#1565D8] hover:bg-blue-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer text-center uppercase tracking-wider"
+                    >
+                      Edit Profile Details
+                    </button>
                   </div>
                 </div>
               ) : linkedStudent && linkedStudent.status === "pending" ? (
@@ -1685,6 +1847,132 @@ export default function VoterDashboard({
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT PROFILE MODAL */}
+      {isEditProfileModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-scaleUp max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-bold text-zinc-950 dark:text-zinc-50">
+                  Edit Student Profile Details
+                </h3>
+                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  Update your active university profile info.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditProfileModalOpen(false)}
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 rounded-full cursor-pointer font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedProfile} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editFirstName}
+                    onChange={(e) => setEditFirstName(e.target.value)}
+                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    Surname
+                  </label>
+                  <input
+                    type="text"
+                    value={editSurname}
+                    onChange={(e) => setEditSurname(e.target.value)}
+                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  CUM Number
+                </label>
+                <input
+                  type="text"
+                  value={editCum}
+                  onChange={(e) => setEditCum(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  Program Course
+                </label>
+                <input
+                  type="text"
+                  value={editProgram}
+                  onChange={(e) => setEditProgram(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    Academic Year
+                  </label>
+                  <input
+                    type="text"
+                    value={editYear}
+                    onChange={(e) => setEditYear(e.target.value)}
+                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    Gender
+                  </label>
+                  <select
+                    value={editGender}
+                    onChange={(e) => setEditGender(e.target.value)}
+                    className="w-full px-3 py-2 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                  >
+                    <option value="M">Male (M)</option>
+                    <option value="F">Female (F)</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditProfileModalOpen(false)}
+                  className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-800 text-zinc-500 text-xs font-semibold rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="flex-1 py-2.5 bg-[#1565D8] hover:bg-[#0D5BE1] disabled:opacity-50 text-white font-semibold text-xs rounded-xl shadow-md shadow-blue-500/15 transition-colors cursor-pointer text-center"
+                >
+                  {isSavingProfile ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -1467,8 +1467,8 @@ export default function App() {
                 </form>
               </div>
             ) : pendingIdentityConfirm ? (
-              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-                <div className="text-center space-y-2 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[24px] p-4 sm:p-6 md:p-8 shadow-sm space-y-5">
+                <div className="text-center space-y-2 pb-3.5 border-b border-zinc-100 dark:border-zinc-800 animate-fadeIn">
                   <div className="w-12 h-12 bg-amber-100 dark:bg-amber-950/40 rounded-2xl flex items-center justify-center text-amber-600 mx-auto">
                     <UserCheck className="w-6 h-6 animate-pulse" />
                   </div>
@@ -1553,14 +1553,14 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex gap-3.5 pt-3">
+                <div className="flex flex-col sm:flex-row gap-2.5 pt-3">
                   <button
                     type="button"
                     onClick={() => {
                       setPendingIdentityConfirm(null);
                       showToast("Identity confirmation cancelled.");
                     }}
-                    className="flex-1 py-3 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-semibold rounded-full transition-all active:scale-95 cursor-pointer text-center"
+                    className="w-full sm:flex-1 py-3 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-semibold rounded-full transition-all active:scale-95 cursor-pointer text-center"
                   >
                     No, Disconnect Email
                   </button>
@@ -1587,7 +1587,7 @@ export default function App() {
                         );
                       }
                     }}
-                    className="flex-1 py-3 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-500/10 transition-all active:scale-95 cursor-pointer text-center"
+                    className="w-full sm:flex-1 py-3 bg-[#1565D8] hover:bg-blue-900 text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-500/10 transition-all active:scale-95 cursor-pointer text-center"
                   >
                     Yes, Confirm & Explore
                   </button>

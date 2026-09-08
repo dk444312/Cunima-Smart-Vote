@@ -99,6 +99,11 @@ export default function CandidatesManager({
   });
   const [selectedPositionId, setSelectedPositionId] = useState<string>("");
 
+  // Custom Election form state
+  const [isCreatingCustomElection, setIsCreatingCustomElection] = useState<boolean>(false);
+  const [customElectionTitle, setCustomElectionTitle] = useState<string>("");
+  const [customElectionDesc, setCustomElectionDesc] = useState<string>("");
+
   // Candidate Sub-View: 'roster' (view candidates) or 'add' (add/edit form)
   const [candidateViewMode, setCandidateViewMode] = useState<"roster" | "form">("roster");
 
@@ -234,6 +239,56 @@ export default function CandidatesManager({
       showToast('Created "CUNIMA Guild Council Elections 2026"!');
     } catch (err: any) {
       showToast(`Error creating election: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveCustomElection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customElectionTitle.trim()) {
+      showToast("Election name is required.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const defaultPositions: Position[] = [
+        {
+          id: `pos_pres_${Date.now()}`,
+          title: "President",
+          candidates: [],
+        },
+        {
+          id: `pos_vp_${Date.now()}`,
+          title: "Vice President",
+          candidates: [],
+        },
+        {
+          id: `pos_sec_${Date.now()}`,
+          title: "Secretary General",
+          candidates: [],
+        },
+      ];
+
+      const created = await dbService.insertElection(
+        customElectionTitle.trim(),
+        customElectionDesc.trim(),
+        [],
+        null,
+        "draft",
+        defaultPositions
+      );
+
+      await onRefresh();
+      setSelectedElectionId(created.id);
+      setIsCreatingCustomElection(false);
+      setCustomElectionTitle("");
+      setCustomElectionDesc("");
+      setCurrentStep("election_hub");
+      showToast(`Created Custom Election: "${created.title}"!`);
+    } catch (err: any) {
+      showToast(`Error creating custom election: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -585,7 +640,7 @@ export default function CandidatesManager({
 
             <button
               type="button"
-              onClick={handleQuickCreateElection}
+              onClick={() => setIsCreatingCustomElection(true)}
               className="px-4 py-2 bg-[#0B1E40] hover:bg-blue-900 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" />
@@ -603,16 +658,16 @@ export default function CandidatesManager({
                   No Elections Configured Yet
                 </h3>
                 <p className="text-xs text-zinc-400 max-w-md mx-auto">
-                  Click the button below to generate the official CUNIMA Guild Council Elections 2026 and start adding positions and candidates.
+                  Click the button below to create your first custom election and start configuring positions and candidates.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={handleQuickCreateElection}
+                onClick={() => setIsCreatingCustomElection(true)}
                 className="px-5 py-2.5 bg-[#0B1E40] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer inline-flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
-                <span>Create CUNIMA Guild Council Elections 2026</span>
+                <span>Create New Election</span>
               </button>
             </div>
           ) : (
@@ -1691,6 +1746,76 @@ export default function CandidatesManager({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* CUSTOM ELECTION CREATION MODAL */}
+      {isCreatingCustomElection && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-scaleUp">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-bold text-zinc-950 dark:text-zinc-50">
+                  Create Custom Election
+                </h3>
+                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  Define custom fields for your new election. Default candidate positions (President, Vice President, Secretary General) will be pre-created.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreatingCustomElection(false)}
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 rounded-full cursor-pointer font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCustomElection} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  Election Name
+                </label>
+                <input
+                  type="text"
+                  value={customElectionTitle}
+                  onChange={(e) => setCustomElectionTitle(e.target.value)}
+                  placeholder="e.g. Campus Student Union Elections 2026"
+                  className="w-full px-3.5 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  Description
+                </label>
+                <textarea
+                  value={customElectionDesc}
+                  onChange={(e) => setCustomElectionDesc(e.target.value)}
+                  placeholder="e.g. Official campus student council executive elections."
+                  rows={3}
+                  className="w-full px-3.5 py-2.5 bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-blue-500 focus:outline-none text-xs text-zinc-900 dark:text-zinc-100 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingCustomElection(false)}
+                  className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-800 text-zinc-500 text-xs font-semibold rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-[#1565D8] hover:bg-[#0D5BE1] text-white font-semibold text-xs rounded-xl shadow-md shadow-blue-500/15 transition-colors cursor-pointer text-center"
+                >
+                  Save & Open
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

@@ -1033,6 +1033,34 @@ export const dbService = {
     }
   },
 
+  async updateStudentProfile(
+    id: string,
+    updates: {
+      first_name?: string;
+      surname?: string;
+      program_name?: string;
+      academic_year?: string;
+      gender?: string;
+      cum_number?: string;
+    }
+  ): Promise<void> {
+    invalidateDBCache();
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase
+        .from("students")
+        .update(updates)
+        .eq("id", id);
+      if (error) throw error;
+      return;
+    }
+    const local = getLocalTable<StudentRow>(STUDENTS_KEY);
+    const idx = local.findIndex((s) => s.id === id);
+    if (idx >= 0) {
+      local[idx] = { ...local[idx], ...updates };
+      saveLocalTable(STUDENTS_KEY, local);
+    }
+  },
+
   async importStudentsBulk(
     students: Omit<StudentRow, "id" | "uploaded_at">[],
   ): Promise<void> {
