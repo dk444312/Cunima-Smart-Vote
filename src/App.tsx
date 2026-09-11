@@ -38,21 +38,11 @@ import {
   isSupabaseConfigured,
   initializeDatabase,
   getElectionPositions,
+  getLocalCache,
+  CACHE_KEYS,
   PREMADE_ADMIN,
   PREMADE_VOTER,
   PREMADE_MANAGER,
-  ELECTIONS_KEY,
-  VOTERS_KEY,
-  VOTES_KEY,
-  CLUBS_KEY,
-  CLUB_MEMBERS_KEY,
-  UPDATES_KEY,
-  UPDATE_LIKES_KEY,
-  UPDATE_COMMENTS_KEY,
-  STUDENTS_KEY,
-  getLocalTable,
-  saveLocalTable,
-  sanitizeVoters,
 } from "./lib/supabase.ts";
 import {
   ElectionRow,
@@ -71,14 +61,30 @@ import {
 import { signInWithGoogle, logoutFirebase } from "./lib/firebase.ts";
 import { getUserAvatarUrl } from "./lib/avatar.ts";
 
-// Restructured modular dashboard views
-import AdminDashboard from "./components/admin/AdminDashboard.tsx";
-import VoterDashboard from "./components/users/VoterDashboard.tsx";
-import ClubManagerDashboard from "./components/club/ClubManagerDashboard.tsx";
+// Restructured modular dashboard views - Lazy loaded to eliminate bundle delays
+const AdminDashboard = React.lazy(() => import("./components/admin/AdminDashboard.tsx"));
+const VoterDashboard = React.lazy(() => import("./components/users/VoterDashboard.tsx"));
+const ClubManagerDashboard = React.lazy(() => import("./components/club/ClubManagerDashboard.tsx"));
+
+// Lightweight non-blocking fallback for dashboard views
+function DashboardFallback() {
+  return (
+    <div className="w-full min-h-[350px] flex flex-col items-center justify-center p-8 space-y-3">
+      <div className="w-8 h-8 border-3 border-[#1565D8] border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500">Loading view...</span>
+    </div>
+  );
+}
 
 export default function App() {
-  // Theme state
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Theme state with local persistence
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      return localStorage.getItem("campusvote_theme") === "dark";
+    } catch {
+      return false;
+    }
+  });
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<LoggedInUser | null>(() => {
@@ -96,64 +102,39 @@ export default function App() {
   const [showCredentialsForm, setShowCredentialsForm] = useState(false);
   const [showCredentialsWarningModal, setShowCredentialsWarningModal] = useState(false);
 
-  // Database State Mirrors initialized immediately from localStorage (instant display, no flash)
+  // Database State Mirrors - Instantly initialized from local cache (0ms delay)
   const [elections, setElections] = useState<ElectionRow[]>(() =>
-    getLocalTable<ElectionRow>(ELECTIONS_KEY, []),
+    getLocalCache<ElectionRow[]>(CACHE_KEYS.ELECTIONS) || []
   );
   const [voters, setVoters] = useState<VoterRow[]>(() =>
-    getLocalTable<VoterRow>(VOTERS_KEY, []),
+    getLocalCache<VoterRow[]>(CACHE_KEYS.VOTERS) || []
   );
   const [votes, setVotes] = useState<VoteRow[]>(() =>
-    getLocalTable<VoteRow>(VOTES_KEY, []),
+    getLocalCache<VoteRow[]>(CACHE_KEYS.VOTES) || []
   );
   const [clubs, setClubs] = useState<ClubRow[]>(() =>
-    getLocalTable<ClubRow>(CLUBS_KEY, []),
+    getLocalCache<ClubRow[]>(CACHE_KEYS.CLUBS) || []
   );
   const [clubMembers, setClubMembers] = useState<ClubMemberRow[]>(() =>
-    getLocalTable<ClubMemberRow>(CLUB_MEMBERS_KEY, []),
+    getLocalCache<ClubMemberRow[]>(CACHE_KEYS.CLUB_MEMBERS) || []
   );
   const [updates, setUpdates] = useState<UpdateRow[]>(() =>
-    getLocalTable<UpdateRow>(UPDATES_KEY, []),
+    getLocalCache<UpdateRow[]>(CACHE_KEYS.UPDATES) || []
   );
-  const [updateLikes, setUpdateLikes] = useState<
-    Record<string, UpdateLikeRow[]>
-  >(() => {
-    try {
-      const saved = localStorage.getItem(UPDATE_LIKES_KEY);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-  const [updateComments, setUpdateComments] = useState<
-    Record<string, UpdateCommentRow[]>
-  >(() => {
-    try {
-      const saved = localStorage.getItem(UPDATE_COMMENTS_KEY);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [updateLikes, setUpdateLikes] = useState<Record<string, UpdateLikeRow[]>>(() =>
+    getLocalCache<Record<string, UpdateLikeRow[]>>(CACHE_KEYS.UPDATE_LIKES) || {}
+  );
+  const [updateComments, setUpdateComments] = useState<Record<string, UpdateCommentRow[]>>(() =>
+    getLocalCache<Record<string, UpdateCommentRow[]>>(CACHE_KEYS.UPDATE_COMMENTS) || {}
+  );
   const [students, setStudents] = useState<StudentRow[]>(() =>
-    getLocalTable<StudentRow>(STUDENTS_KEY, []),
+    getLocalCache<StudentRow[]>(CACHE_KEYS.STUDENTS) || []
   );
-  // Only true during initial boot before user login
-  const [isLoading, setIsLoading] = useState(() => {
-    try {
-      const saved = localStorage.getItem("g_election_active_user");
-      return !saved;
-    } catch {
-      return true;
-    }
-  });
-  const [showOctopasSplash, setShowOctopasSplash] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Guarded loader - strictly only allows loader before user login
+  // Non-intrusive action loading trigger (for buttons and inline spinners)
   const setAppLoading = (val: boolean) => {
-    if (!currentUser) {
-      setIsLoading(val);
-    }
+    setIsLoading(val);
   };
 
   // Student Registration Form States (Google or Username/Password Auth)
@@ -221,10 +202,26 @@ export default function App() {
     Record<string, string>
   >({}); // updateId -> commentText
 
-  // Navigation state
+  // Navigation state with local persistence
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<string>("election");
+  const [activeMenuState, setActiveMenuState] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("campusvote_active_menu");
+      return saved || "home";
+    } catch {
+      return "home";
+    }
+  });
+
+  const setActiveMenu = (menu: string) => {
+    setActiveMenuState(menu);
+    try {
+      localStorage.setItem("campusvote_active_menu", menu);
+    } catch {}
+  };
+  const activeMenu = activeMenuState;
+
   const [visiblePasswords, setVisiblePasswords] = useState<
     Record<string, boolean>
   >({});
@@ -240,69 +237,47 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Modular refresh functions - loads data strictly based on what the page needs and caches locally
-  const refreshElectionsAndVotes = async () => {
+  // Granular on-demand data loaders to only fetch what the user is currently using
+  const loadElectionsData = async () => {
     try {
-      const [fetchedElections, fetchedVotes] = await Promise.all([
-        dbService.getElections(),
-        dbService.getVotes(),
-      ]);
-      setElections(fetchedElections);
-      setVotes(fetchedVotes);
-      saveLocalTable(ELECTIONS_KEY, fetchedElections);
-      saveLocalTable(VOTES_KEY, fetchedVotes);
+      const data = await dbService.getElections();
+      setElections(data);
     } catch (e) {
-      console.warn("Background refresh elections/votes error:", e);
+      console.warn("Could not load elections:", e);
     }
   };
 
-  const refreshStudents = async () => {
+  const loadVotesData = async () => {
     try {
-      const fetchedStudents = await dbService.getStudents();
-      setStudents(fetchedStudents);
-      saveLocalTable(STUDENTS_KEY, fetchedStudents);
+      const data = await dbService.getVotes();
+      setVotes(data);
     } catch (e) {
-      console.warn("Background refresh students error:", e);
+      console.warn("Could not load votes:", e);
     }
   };
 
-  const refreshVoters = async () => {
+  const loadClubsData = async () => {
     try {
-      const fetchedVoters = await dbService.getVoters();
-      setVoters(fetchedVoters);
-      // Credentials (passwords) are excluded from user local storage for security
-      const safeVoters = sanitizeVoters(fetchedVoters);
-      saveLocalTable(VOTERS_KEY, safeVoters);
-    } catch (e) {
-      console.warn("Background refresh voters error:", e);
-    }
-  };
-
-  const refreshClubs = async () => {
-    try {
-      const [fetchedClubs, fetchedClubMembers] = await Promise.all([
+      const [allClubs, allClubMembers] = await Promise.all([
         dbService.getClubs(),
         dbService.getClubMembers(),
       ]);
-      setClubs(fetchedClubs);
-      setClubMembers(fetchedClubMembers);
-      saveLocalTable(CLUBS_KEY, fetchedClubs);
-      saveLocalTable(CLUB_MEMBERS_KEY, fetchedClubMembers);
+      setClubs(allClubs);
+      setClubMembers(allClubMembers);
     } catch (e) {
-      console.warn("Background refresh clubs error:", e);
+      console.warn("Could not load clubs:", e);
     }
   };
 
-  const refreshUpdates = async () => {
+  const loadUpdatesData = async () => {
     try {
-      const fetchedUpdates = await dbService.getUpdates();
-      setUpdates(fetchedUpdates);
-      saveLocalTable(UPDATES_KEY, fetchedUpdates);
-
+      const allUpdates = await dbService.getUpdates();
+      setUpdates(allUpdates);
+      // Fetch social details for updates
       const likesMap: Record<string, UpdateLikeRow[]> = {};
       const commentsMap: Record<string, UpdateCommentRow[]> = {};
       await Promise.all(
-        fetchedUpdates.map(async (upd) => {
+        allUpdates.slice(0, 10).map(async (upd) => {
           const [likes, comments] = await Promise.all([
             dbService.getUpdateLikes(upd.id),
             dbService.getUpdateComments(upd.id),
@@ -311,145 +286,109 @@ export default function App() {
           commentsMap[upd.id] = comments;
         }),
       );
-      setUpdateLikes(likesMap);
-      setUpdateComments(commentsMap);
-      try {
-        localStorage.setItem(UPDATE_LIKES_KEY, JSON.stringify(likesMap));
-        localStorage.setItem(UPDATE_COMMENTS_KEY, JSON.stringify(commentsMap));
-      } catch (e) {}
+      setUpdateLikes((prev) => ({ ...prev, ...likesMap }));
+      setUpdateComments((prev) => ({ ...prev, ...commentsMap }));
     } catch (e) {
-      console.warn("Background refresh updates error:", e);
+      console.warn("Could not load updates:", e);
     }
   };
 
-  // Load specifically based on the active page/menu
-  const loadPageData = async (page: string) => {
-    switch (page) {
-      case "election":
-      case "voting":
-      case "results":
-      case "voter_turnout":
-        await refreshElectionsAndVotes();
-        break;
-      case "students":
-      case "student_approval":
-        await refreshStudents();
-        break;
-      case "voters":
-      case "roles":
-      case "guard":
-        await refreshVoters();
-        break;
-      case "clubs":
-      case "club_elections":
-        await refreshClubs();
-        break;
-      case "home":
-      case "updates":
-        await refreshUpdates();
-        break;
-      default:
-        refreshElectionsAndVotes();
-        break;
+  const loadStudentsData = async () => {
+    try {
+      const data = await dbService.getStudents();
+      setStudents(data);
+    } catch (e) {
+      console.warn("Could not load students:", e);
     }
   };
 
-  // Sync state with database
+  const loadVotersData = async () => {
+    try {
+      const data = await dbService.getVoters();
+      setVoters(data);
+    } catch (e) {
+      console.warn("Could not load voters:", e);
+    }
+  };
+
+  // Targeted sync with database - strictly loads only what the user is currently using
   const refreshDatabaseState = async () => {
     try {
       if (!currentUser) {
-        setIsLoading(true);
-      }
-      if (currentUser) {
-        await loadPageData(activeMenu);
+        await loadElectionsData();
         return;
       }
-      const [
-        allElections,
-        allVoters,
-        allVotes,
-        allClubs,
-        allClubMembers,
-        allUpdates,
-        allStudents,
-      ] = await Promise.all([
-        dbService.getElections(),
-        dbService.getVoters(),
-        dbService.getVotes(),
-        dbService.getClubs(),
-        dbService.getClubMembers(),
-        dbService.getUpdates(),
-        dbService.getStudents(),
-      ]);
 
-      setElections(allElections);
-      setVoters(allVoters);
-      setVotes(allVotes);
-      setClubs(allClubs);
-      setClubMembers(allClubMembers);
-      setUpdates(allUpdates);
-      setStudents(allStudents);
+      if (currentUser.role === "voter") {
+        const tasks: Promise<any>[] = [loadElectionsData(), loadVotesData()];
+        if (activeMenu === "clubs") tasks.push(loadClubsData());
+        if (activeMenu === "updates") tasks.push(loadUpdatesData());
+        if (activeMenu === "profile" && students.length === 0) tasks.push(loadStudentsData());
+        await Promise.all(tasks);
+        return;
+      }
 
-      saveLocalTable(ELECTIONS_KEY, allElections);
-      saveLocalTable(VOTES_KEY, allVotes);
-      saveLocalTable(CLUBS_KEY, allClubs);
-      saveLocalTable(CLUB_MEMBERS_KEY, allClubMembers);
-      saveLocalTable(UPDATES_KEY, allUpdates);
-      saveLocalTable(STUDENTS_KEY, allStudents);
-      const safeVoters = sanitizeVoters(allVoters);
-      saveLocalTable(VOTERS_KEY, safeVoters);
+      if (currentUser.role === "club_manager") {
+        const tasks: Promise<any>[] = [
+          loadElectionsData(),
+          loadVotesData(),
+          loadClubsData(),
+        ];
+        if (activeMenu === "club_updates") tasks.push(loadUpdatesData());
+        await Promise.all(tasks);
+        return;
+      }
 
-      // Fetch social details in parallel for each update
-      const likesMap: Record<string, UpdateLikeRow[]> = {};
-      const commentsMap: Record<string, UpdateCommentRow[]> = {};
-
-      await Promise.all(
-        allUpdates.map(async (upd) => {
-          const [likes, comments] = await Promise.all([
-            dbService.getUpdateLikes(upd.id),
-            dbService.getUpdateComments(upd.id),
-          ]);
-          likesMap[upd.id] = likes;
-          commentsMap[upd.id] = comments;
-        }),
-      );
-
-      setUpdateLikes(likesMap);
-      setUpdateComments(commentsMap);
-      try {
-        localStorage.setItem(UPDATE_LIKES_KEY, JSON.stringify(likesMap));
-        localStorage.setItem(UPDATE_COMMENTS_KEY, JSON.stringify(commentsMap));
-      } catch (e) {}
+      if (currentUser.role === "admin") {
+        const tasks: Promise<any>[] = [loadElectionsData(), loadVotesData()];
+        if (activeMenu === "students") tasks.push(loadStudentsData());
+        if (activeMenu === "voters") tasks.push(loadVotersData());
+        if (activeMenu === "clubs") tasks.push(loadClubsData());
+        if (activeMenu === "updates") tasks.push(loadUpdatesData());
+        await Promise.all(tasks);
+        return;
+      }
     } catch (err: any) {
-      console.error("Database connection refresh delay or error:", err);
-      showToast(
-        `Database Delay / Fallback active: ${err.message || "using local cached rows"}`,
-      );
-    } finally {
-      setIsLoading(false);
+      console.warn("Database sync notice:", err);
     }
   };
 
-  // Initialize DB and state
+  // Instant non-blocking initialization on mount (No splash delays, no screen lock)
   useEffect(() => {
-    const init = async () => {
-      await initializeDatabase();
-      const hasSeenSplash = localStorage.getItem("has_seen_octopas_splash");
-      if (!hasSeenSplash) {
-        setShowOctopasSplash(true);
-        // Show Octopas splash screen for 1.2 seconds first
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-        setShowOctopasSplash(false);
-        localStorage.setItem("has_seen_octopas_splash", "true");
-      }
-      await refreshDatabaseState();
-      setIsLoading(false);
-    };
-    init();
+    initializeDatabase().catch(() => {});
+    refreshDatabaseState().catch(() => {});
   }, []);
+
+  // Lazy load data on-demand as user navigates to specific tabs
+  useEffect(() => {
+    if (!currentUser) return;
+    if (activeMenu === "clubs") {
+      loadClubsData();
+    } else if (activeMenu === "updates" || activeMenu === "club_updates") {
+      loadUpdatesData();
+    } else if (currentUser.role === "admin") {
+      if (activeMenu === "students") loadStudentsData();
+      if (activeMenu === "voters") loadVotersData();
+      if (activeMenu === "clubs") loadClubsData();
+      if (activeMenu === "updates") loadUpdatesData();
+    }
+  }, [activeMenu, currentUser]);
 
   useEffect(() => {
     if (currentUser) {
+      const savedTab = localStorage.getItem("campusvote_active_menu");
+      if (savedTab) {
+        if (currentUser.role === "admin" && ["election", "candidates", "results", "voters", "students", "clubs", "updates", "sql_db"].includes(savedTab)) {
+          setActiveMenuState(savedTab);
+          return;
+        } else if (currentUser.role === "club_manager" && ["club_elections", "club_members", "feed", "profile"].includes(savedTab)) {
+          setActiveMenuState(savedTab);
+          return;
+        } else if (currentUser.role === "voter" && ["home", "elections", "results", "security", "profile"].includes(savedTab)) {
+          setActiveMenuState(savedTab);
+          return;
+        }
+      }
       if (currentUser.role === "admin") {
         setActiveMenu("election");
       } else if (currentUser.role === "club_manager") {
@@ -460,19 +399,14 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // Load data based on the page user is currently on
-  useEffect(() => {
-    if (currentUser) {
-      loadPageData(activeMenu);
-    }
-  }, [activeMenu, currentUser]);
-
   // Sync Dark Mode Class on Document Body
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add("dark");
+      localStorage.setItem("campusvote_theme", "dark");
     } else {
       document.documentElement.classList.remove("dark");
+      localStorage.setItem("campusvote_theme", "light");
     }
   }, [isDarkMode]);
 
@@ -762,12 +696,23 @@ export default function App() {
         return;
       }
 
-      // Quick Searching UI
+      // Trigger Searching UI
       setIsSearchingProfile(true);
       setCurrentUserDisplay(displayName);
       setSearchStateMessage(
-        "Scanning student registry...",
+        "Establishing secure connection to CampusVote Database...",
       );
+      await new Promise((resolve) => setTimeout(resolve, 700));
+
+      setSearchStateMessage(
+        `Parsing name structures from authenticated email "${email}"...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      setSearchStateMessage(
+        "Scanning student registry columns for bi-directional similarities...",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 900));
 
       // Check Student Register Database: Check full name and the email address name
       const matchedStudent = students.find((s) => {
@@ -812,6 +757,11 @@ export default function App() {
       });
 
       if (matchedStudent) {
+        setSearchStateMessage(
+          `Match Identified! Connecting to student profile of "${matchedStudent.first_name} ${matchedStudent.surname}" [${matchedStudent.registration_number}]...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 900));
+
         // Automatically save their Google email to their student record if it's not set
         if (
           !matchedStudent.email ||
@@ -819,7 +769,7 @@ export default function App() {
         ) {
           try {
             await dbService.linkStudentEmail(matchedStudent.id, email);
-            refreshStudents();
+            await refreshDatabaseState();
           } catch (linkErr) {
             console.error(
               "Auto linking Google email to student profile failed:",
@@ -849,7 +799,7 @@ export default function App() {
               "firebase_secret",
               "voter",
             );
-            refreshVoters();
+            await refreshDatabaseState();
           } catch (dbErr) {
             console.error("Auto registration voter failed:", dbErr);
           }
@@ -877,6 +827,10 @@ export default function App() {
         });
         showToast("Profile Match Identified: Please confirm your identity.");
       } else {
+        setSearchStateMessage(
+          "No matching student profile found in standard directory database. Redirecting to registration...",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         // NOT in database at all! Trigger Student Profile Registration form!
         setPendingGoogleUser({ email, displayName, uid: user.uid });
         showToast(
@@ -935,7 +889,7 @@ export default function App() {
       setRegGender("M");
 
       // Sync the states
-      await refreshStudents();
+      await refreshDatabaseState();
       setGoogleRegSuccess(true);
       showToast(
         "Your registration profile has been successfully submitted for administrator approval.",
@@ -1010,7 +964,7 @@ export default function App() {
         "draft",
         validPositions,
       );
-      await refreshElectionsAndVotes();
+      await refreshDatabaseState();
 
       setNewElectionTitle("");
       setNewElectionDesc("");
@@ -1044,7 +998,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.updateElection(id, { status });
-      await refreshElectionsAndVotes();
+      await refreshDatabaseState();
       showToast(`SQL UPDATE SUCCESS: Election status updated to "${status}".`);
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -1057,7 +1011,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.deleteElection(id);
-      await refreshElectionsAndVotes();
+      await refreshDatabaseState();
       showToast("SQL DELETE SUCCESS: Election sheet deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -1108,7 +1062,7 @@ export default function App() {
       );
 
       await dbService.updateElection(electionId, { status: "completed" });
-      await refreshElectionsAndVotes();
+      await refreshDatabaseState();
       showToast(
         `SQL SIMULATION: Distributed random ballot entries across all positions to active voter base.`,
       );
@@ -1130,7 +1084,7 @@ export default function App() {
         newVoterPassword.trim() || "Pass123",
         newVoterRole as any,
       );
-      await refreshVoters();
+      await refreshDatabaseState();
 
       setNewVoterUsername("");
       setNewVoterPassword("");
@@ -1149,7 +1103,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.updateVoter(v.id, { role: nextRole });
-      await refreshVoters();
+      await refreshDatabaseState();
       showToast(
         `SQL UPDATE SUCCESS: Changed "${v.username}" to ${nextRole === "club_manager" ? "Club Manager" : "Voter"}.`,
       );
@@ -1164,7 +1118,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.updateVoter(v.id, { is_blocked: !v.is_blocked });
-      await refreshVoters();
+      await refreshDatabaseState();
       showToast(
         `SQL UPDATE SUCCESS: ${v.is_blocked ? "Unblocked" : "Blocked"} voter "${v.username}".`,
       );
@@ -1179,7 +1133,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.deleteVoter(id);
-      await refreshVoters();
+      await refreshDatabaseState();
       showToast("SQL DELETE SUCCESS: Account credentials deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -1192,7 +1146,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.updateElection(id, { published });
-      await refreshElectionsAndVotes();
+      await refreshDatabaseState();
       showToast(
         `SQL UPDATE SUCCESS: Feed visibility changed to ${published ? "Visible" : "Hidden"}.`,
       );
@@ -1218,7 +1172,7 @@ export default function App() {
         newClubDesc.trim() || "No description provided.",
         newClubManagerId,
       );
-      await refreshClubs();
+      await refreshDatabaseState();
 
       setNewClubName("");
       setNewClubDesc("");
@@ -1237,7 +1191,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.deleteClub(id);
-      await refreshClubs();
+      await refreshDatabaseState();
       showToast("SQL DELETE SUCCESS: Club page deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -1258,7 +1212,7 @@ export default function App() {
       setAppLoading(true);
       await dbService.setClubMembers(clubId, updatedIds);
       showToast("SQL TRANSACTION SUCCESS: Club roster updated.");
-      await refreshClubs();
+      await refreshDatabaseState();
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
@@ -1278,7 +1232,7 @@ export default function App() {
         "Administrator",
         mediaUrl,
       );
-      await refreshUpdates();
+      await refreshDatabaseState();
       setNewUpdateContent("");
       showToast("SQL BROADCAST SUCCESS: Verified update broadcasted globally.");
     } catch (err: any) {
@@ -1292,7 +1246,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.deleteUpdate(id);
-      await refreshUpdates();
+      await refreshDatabaseState();
       showToast("SQL DELETE SUCCESS: Broadcast update deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -1309,7 +1263,7 @@ export default function App() {
         currentUser.id,
         currentUser.username,
       );
-      await refreshUpdates();
+      await refreshDatabaseState();
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     }
@@ -1329,7 +1283,7 @@ export default function App() {
         text.trim(),
       );
       setNewCommentContents((prev) => ({ ...prev, [updateId]: "" }));
-      await refreshUpdates();
+      await refreshDatabaseState();
       showToast("SQL COMMENT SUCCESS: Comment post row added.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -2414,128 +2368,123 @@ export default function App() {
 
             {/* MAIN PORTLET CONTAINER */}
             <main className="flex-1 p-4 sm:p-6 md:p-8 pb-28 md:pb-8 max-w-6xl mx-auto w-full overflow-y-auto min-w-0">
-              {currentUser.role === "admin" ? (
-                /* ================== ROUTED ADMIN PORTAL ================== */
-                <AdminDashboard
-                  currentUser={currentUser}
-                  activeMenu={activeMenu}
-                  setActiveMenu={setActiveMenu}
-                  elections={elections}
-                  votes={votes}
-                  voters={voters}
-                  clubs={clubs}
-                  clubMembers={clubMembers}
-                  updates={updates}
-                  updateLikes={updateLikes}
-                  updateComments={updateComments}
-                  visiblePasswords={visiblePasswords}
-                  setVisiblePasswords={setVisiblePasswords}
-                  students={students}
-                  newElectionTitle={newElectionTitle}
-                  setNewElectionTitle={setNewElectionTitle}
-                  newElectionDesc={newElectionDesc}
-                  setNewElectionDesc={setNewElectionDesc}
-                  candidateInput={candidateInput}
-                  setCandidateInput={setCandidateInput}
-                  candidates={candidates}
-                  candidatePhoto={candidatePhoto}
-                  setCandidatePhoto={setCandidatePhoto}
-                  setCandidates={setCandidates}
-                  positions={positions}
-                  setPositions={setPositions}
-                  handleCreateElection={handleCreateElection}
-                  newVoterUsername={newVoterUsername}
-                  setNewVoterUsername={setNewVoterUsername}
-                  newVoterPassword={newVoterPassword}
-                  setNewVoterPassword={setNewVoterPassword}
-                  newVoterRole={newVoterRole}
-                  setNewVoterRole={setNewVoterRole}
-                  handleCreateVoter={handleCreateVoter}
-                  handleUpdateElectionStatus={handleUpdateElectionStatus}
-                  handleDeleteElection={handleDeleteElection}
-                  simulateVotes={simulateVotes}
-                  toggleVoterRole={toggleVoterRole}
-                  toggleBlockVoter={toggleBlockVoter}
-                  handleDeleteVoter={handleDeleteVoter}
-                  togglePublishResults={togglePublishResults}
-                  newClubName={newClubName}
-                  setNewClubName={setNewClubName}
-                  newClubDesc={newClubDesc}
-                  setNewClubDesc={setNewClubDesc}
-                  newClubManagerId={newClubManagerId}
-                  setNewClubManagerId={setNewClubManagerId}
-                  handleCreateClub={handleCreateClub}
-                  handleDeleteClub={handleDeleteClub}
-                  handleToggleClubMember={handleToggleClubMember}
-                  selectedClubIdForManage={selectedClubIdForManage}
-                  setSelectedClubIdForManage={setSelectedClubIdForManage}
-                  newUpdateContent={newUpdateContent}
-                  setNewUpdateContent={setNewUpdateContent}
-                  handleCreateUpdate={handleCreateUpdate}
-                  handleDeleteUpdate={handleDeleteUpdate}
-                  handleToggleLikeUpdate={handleToggleLikeUpdate}
-                  newCommentContents={newCommentContents}
-                  setNewCommentContents={setNewCommentContents}
-                  handlePostComment={handlePostComment}
-                  truncateDatabase={truncateDatabase}
-                  refreshDatabaseState={refreshDatabaseState}
-                  showToast={showToast}
-                  setIsLoading={setAppLoading}
-                />
-              ) : currentUser.role === "club_manager" ? (
-                /* ================== ROUTED CLUB MANAGER PORTAL ================== */
-                <ClubManagerDashboard
-                  currentUser={currentUser}
-                  clubs={clubs}
-                  clubMembers={clubMembers}
-                  voters={voters}
-                  elections={elections}
-                  votes={votes}
-                  updates={updates}
-                  updateLikes={updateLikes}
-                  updateComments={updateComments}
-                  handleDeleteUpdate={handleDeleteUpdate}
-                  handleToggleLikeUpdate={handleToggleLikeUpdate}
-                  newCommentContents={newCommentContents}
-                  setNewCommentContents={setNewCommentContents}
-                  handlePostComment={handlePostComment}
-                  refreshDatabaseState={refreshDatabaseState}
-                  showToast={showToast}
-                  isLoading={false}
-                  setIsLoading={setAppLoading}
-                  activeTab={activeMenu}
-                />
-              ) : (
-                /* ================== ROUTED GENERAL VOTER PORTAL ================== */
-                <VoterDashboard
-                  currentUser={currentUser}
-                  students={students}
-                  elections={elections}
-                  clubs={clubs}
-                  votes={votes}
-                  clubMembers={clubMembers}
-                  updates={updates}
-                  updateLikes={updateLikes}
-                  updateComments={updateComments}
-                  handleDeleteUpdate={handleDeleteUpdate}
-                  handleToggleLikeUpdate={handleToggleLikeUpdate}
-                  newCommentContents={newCommentContents}
-                  setNewCommentContents={setNewCommentContents}
-                  handlePostComment={handlePostComment}
-                  refreshDatabaseState={refreshDatabaseState}
-                  showToast={showToast}
-                  setIsLoading={setAppLoading}
-                  activeTab={activeMenu}
-                  onNavigate={(tab) => setActiveMenu(tab)}
-                  onVotesCast={(newVotes) => {
-                    setVotes((prev) => {
-                      const updated = [...prev, ...newVotes];
-                      saveLocalTable(VOTES_KEY, updated);
-                      return updated;
-                    });
-                  }}
-                />
-              )}
+              <React.Suspense fallback={<DashboardFallback />}>
+                {currentUser.role === "admin" ? (
+                  /* ================== ROUTED ADMIN PORTAL ================== */
+                  <AdminDashboard
+                    currentUser={currentUser}
+                    activeMenu={activeMenu}
+                    setActiveMenu={setActiveMenu}
+                    elections={elections}
+                    votes={votes}
+                    voters={voters}
+                    clubs={clubs}
+                    clubMembers={clubMembers}
+                    updates={updates}
+                    updateLikes={updateLikes}
+                    updateComments={updateComments}
+                    visiblePasswords={visiblePasswords}
+                    setVisiblePasswords={setVisiblePasswords}
+                    students={students}
+                    newElectionTitle={newElectionTitle}
+                    setNewElectionTitle={setNewElectionTitle}
+                    newElectionDesc={newElectionDesc}
+                    setNewElectionDesc={setNewElectionDesc}
+                    candidateInput={candidateInput}
+                    setCandidateInput={setCandidateInput}
+                    candidates={candidates}
+                    candidatePhoto={candidatePhoto}
+                    setCandidatePhoto={setCandidatePhoto}
+                    setCandidates={setCandidates}
+                    positions={positions}
+                    setPositions={setPositions}
+                    handleCreateElection={handleCreateElection}
+                    newVoterUsername={newVoterUsername}
+                    setNewVoterUsername={setNewVoterUsername}
+                    newVoterPassword={newVoterPassword}
+                    setNewVoterPassword={setNewVoterPassword}
+                    newVoterRole={newVoterRole}
+                    setNewVoterRole={setNewVoterRole}
+                    handleCreateVoter={handleCreateVoter}
+                    handleUpdateElectionStatus={handleUpdateElectionStatus}
+                    handleDeleteElection={handleDeleteElection}
+                    simulateVotes={simulateVotes}
+                    toggleVoterRole={toggleVoterRole}
+                    toggleBlockVoter={toggleBlockVoter}
+                    handleDeleteVoter={handleDeleteVoter}
+                    togglePublishResults={togglePublishResults}
+                    newClubName={newClubName}
+                    setNewClubName={setNewClubName}
+                    newClubDesc={newClubDesc}
+                    setNewClubDesc={setNewClubDesc}
+                    newClubManagerId={newClubManagerId}
+                    setNewClubManagerId={setNewClubManagerId}
+                    handleCreateClub={handleCreateClub}
+                    handleDeleteClub={handleDeleteClub}
+                    handleToggleClubMember={handleToggleClubMember}
+                    selectedClubIdForManage={selectedClubIdForManage}
+                    setSelectedClubIdForManage={setSelectedClubIdForManage}
+                    newUpdateContent={newUpdateContent}
+                    setNewUpdateContent={setNewUpdateContent}
+                    handleCreateUpdate={handleCreateUpdate}
+                    handleDeleteUpdate={handleDeleteUpdate}
+                    handleToggleLikeUpdate={handleToggleLikeUpdate}
+                    newCommentContents={newCommentContents}
+                    setNewCommentContents={setNewCommentContents}
+                    handlePostComment={handlePostComment}
+                    truncateDatabase={truncateDatabase}
+                    refreshDatabaseState={refreshDatabaseState}
+                    showToast={showToast}
+                    setIsLoading={setAppLoading}
+                  />
+                ) : currentUser.role === "club_manager" ? (
+                  /* ================== ROUTED CLUB MANAGER PORTAL ================== */
+                  <ClubManagerDashboard
+                    currentUser={currentUser}
+                    clubs={clubs}
+                    clubMembers={clubMembers}
+                    voters={voters}
+                    elections={elections}
+                    votes={votes}
+                    updates={updates}
+                    updateLikes={updateLikes}
+                    updateComments={updateComments}
+                    handleDeleteUpdate={handleDeleteUpdate}
+                    handleToggleLikeUpdate={handleToggleLikeUpdate}
+                    newCommentContents={newCommentContents}
+                    setNewCommentContents={setNewCommentContents}
+                    handlePostComment={handlePostComment}
+                    refreshDatabaseState={refreshDatabaseState}
+                    showToast={showToast}
+                    isLoading={false}
+                    setIsLoading={setAppLoading}
+                    activeTab={activeMenu}
+                  />
+                ) : (
+                  /* ================== ROUTED GENERAL VOTER PORTAL ================== */
+                  <VoterDashboard
+                    currentUser={currentUser}
+                    students={students}
+                    elections={elections}
+                    clubs={clubs}
+                    votes={votes}
+                    clubMembers={clubMembers}
+                    updates={updates}
+                    updateLikes={updateLikes}
+                    updateComments={updateComments}
+                    handleDeleteUpdate={handleDeleteUpdate}
+                    handleToggleLikeUpdate={handleToggleLikeUpdate}
+                    newCommentContents={newCommentContents}
+                    setNewCommentContents={setNewCommentContents}
+                    handlePostComment={handlePostComment}
+                    refreshDatabaseState={refreshDatabaseState}
+                    showToast={showToast}
+                    setIsLoading={setAppLoading}
+                    activeTab={activeMenu}
+                    onNavigate={(tab) => setActiveMenu(tab)}
+                  />
+                )}
+              </React.Suspense>
             </main>
           </div>
         )}
@@ -3171,40 +3120,6 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* OCTOPAS FIRST TIME WELCOME SPLASH SCREEN */}
-      {showOctopasSplash && (
-        <div className="fixed inset-0 z-[110] bg-white dark:bg-zinc-950 flex flex-col items-center justify-center p-6 select-none animate-fadeIn">
-          <div className="relative w-64 h-64 flex items-center justify-center animate-[pulse_2s_infinite]">
-            <img
-              src="/images/Octopas.png"
-              alt="Octopas Logo"
-              className="w-full h-full object-contain"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div className="mt-8 text-sm font-black tracking-widest text-zinc-400 dark:text-zinc-600 uppercase font-sans animate-pulse">
-            CampusVote Ecosystem
-          </div>
-        </div>
-      )}
-
-      {/* GLOBAL FULL SCREEN LOADER - STRICTLY ONLY BEFORE USER LOGIN */}
-      {!currentUser && isLoading && !showOctopasSplash && (
-        <div className="fixed inset-0 z-[100] bg-white dark:bg-zinc-950 backdrop-blur-md flex flex-col items-center justify-center p-6 select-none cursor-wait text-center">
-          <div className="relative w-44 h-44 flex items-center justify-center animate-[pulse_1.5s_infinite] mb-2">
-            <img
-              src="/images/campusvote loader.png"
-              alt="Loading"
-              className="w-full h-full object-contain"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div className="mt-4 w-36 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden relative">
-            <div className="absolute top-0 bottom-0 left-0 bg-[#1565D8] rounded-full animate-[pulse_1s_infinite]" style={{ width: '100%' }}></div>
-          </div>
-        </div>
-      )}
 
       {/* CUNIMA STUDENT VERIFICATION FULL SCREEN OVERLAY */}
       {isSearchingProfile && (

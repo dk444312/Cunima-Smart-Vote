@@ -38,9 +38,11 @@ import {
   Candidate,
 } from "../../types.ts";
 import { dbService, getElectionPositions } from "../../lib/supabase.ts";
-import UpdatesFeed from "../shared/UpdatesFeed.tsx";
-import StudentsManager from "./StudentsManager.tsx";
-import CandidatesManager from "./CandidatesManager.tsx";
+
+// Lazy-loaded sub-modules for instant initial dashboard rendering
+const UpdatesFeed = React.lazy(() => import("../shared/UpdatesFeed.tsx"));
+const StudentsManager = React.lazy(() => import("./StudentsManager.tsx"));
+const CandidatesManager = React.lazy(() => import("./CandidatesManager.tsx"));
 
 interface AdminDashboardProps {
   currentUser: LoggedInUser;
@@ -793,15 +795,17 @@ export default function AdminDashboard({
 
       {/* ================== CANDIDATES MANAGEMENT VIEW ================== */}
       {activeMenu === "candidates" && (
-        <CandidatesManager
-          elections={elections}
-          onRefresh={refreshDatabaseState}
-          showToast={showToast}
-          setIsLoading={setIsLoading}
-          setActiveMenu={setActiveMenu}
-          initialElectionId={candidateElectionId || undefined}
-          onClearInitialElectionId={() => setCandidateElectionId(null)}
-        />
+        <React.Suspense fallback={<div className="p-8 text-center text-xs text-zinc-400">Loading candidate manager...</div>}>
+          <CandidatesManager
+            elections={elections}
+            onRefresh={refreshDatabaseState}
+            showToast={showToast}
+            setIsLoading={setIsLoading}
+            setActiveMenu={setActiveMenu}
+            initialElectionId={candidateElectionId || undefined}
+            onClearInitialElectionId={() => setCandidateElectionId(null)}
+          />
+        </React.Suspense>
       )}
 
       {/* ================== VOTERS VIEW ================== */}
@@ -1563,21 +1567,23 @@ export default function AdminDashboard({
 
       {/* ================== UPDATES VIEW ================== */}
       {activeMenu === "updates" && (
-        <UpdatesFeed
-          currentUser={currentUser}
-          updates={updates}
-          updateLikes={updateLikes}
-          updateComments={updateComments}
-          newUpdateContent={newUpdateContent}
-          setNewUpdateContent={setNewUpdateContent}
-          handleCreateUpdate={handleCreateUpdate}
-          handleDeleteUpdate={handleDeleteUpdate}
-          handleToggleLikeUpdate={handleToggleLikeUpdate}
-          newCommentContents={newCommentContents}
-          setNewCommentContents={setNewCommentContents}
-          handlePostComment={handlePostComment}
-          isAdmin={true}
-        />
+        <React.Suspense fallback={<div className="p-8 text-center text-xs text-zinc-400">Loading campus updates...</div>}>
+          <UpdatesFeed
+            currentUser={currentUser}
+            updates={updates}
+            updateLikes={updateLikes}
+            updateComments={updateComments}
+            newUpdateContent={newUpdateContent}
+            setNewUpdateContent={setNewUpdateContent}
+            handleCreateUpdate={handleCreateUpdate}
+            handleDeleteUpdate={handleDeleteUpdate}
+            handleToggleLikeUpdate={handleToggleLikeUpdate}
+            newCommentContents={newCommentContents}
+            setNewCommentContents={setNewCommentContents}
+            handlePostComment={handlePostComment}
+            isAdmin={true}
+          />
+        </React.Suspense>
       )}
 
       {/* ================== PROFILE VIEW ================== */}
@@ -1660,12 +1666,14 @@ export default function AdminDashboard({
 
       {/* ================== STUDENTS VIEW ================== */}
       {activeMenu === "students" && (
-        <StudentsManager
-          students={students}
-          refreshDatabaseState={refreshDatabaseState}
-          showToast={showToast}
-          setIsLoading={setIsLoading}
-        />
+        <React.Suspense fallback={<div className="p-8 text-center text-xs text-zinc-400">Loading student directory...</div>}>
+          <StudentsManager
+            students={students}
+            refreshDatabaseState={refreshDatabaseState}
+            showToast={showToast}
+            setIsLoading={setIsLoading}
+          />
+        </React.Suspense>
       )}
 
       {/* ================== VERIFIED USERS VIEW ================== */}

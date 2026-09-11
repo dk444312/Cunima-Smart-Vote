@@ -5,7 +5,6 @@ import {
   FileText,
   AlertCircle,
   Check,
-  CheckCircle2,
   Sparkles,
   User,
   BadgeAlert,
@@ -32,15 +31,11 @@ import {
   Position,
   Candidate,
 } from "../../types.ts";
-import {
-  dbService,
-  getElectionPositions,
-  VOTES_KEY,
-  getLocalTable,
-  saveLocalTable,
-} from "../../lib/supabase.ts";
-import UpdatesFeed from "../shared/UpdatesFeed.tsx";
+import { dbService, getElectionPositions, preferenceStorage } from "../../lib/supabase.ts";
 import { getUserAvatarUrl } from "../../lib/avatar.ts";
+
+// Lazy load social updates feed to optimize bundle size and speed
+const UpdatesFeed = React.lazy(() => import("../shared/UpdatesFeed.tsx"));
 
 interface VoterDashboardProps {
   currentUser: LoggedInUser;
@@ -65,7 +60,6 @@ interface VoterDashboardProps {
   activeTab: string;
   onNavigate?: (tab: string) => void;
   onRequireLogin?: () => void;
-  onVotesCast?: (newVotes: VoteRow[]) => void;
 }
 
 export default function VoterDashboard({
@@ -88,23 +82,13 @@ export default function VoterDashboard({
   setIsLoading,
   activeTab,
   onNavigate,
-  onVotesCast,
 }: VoterDashboardProps) {
   // Keyed by `${electionId}_${positionId}` -> { candidateName, candidateId }
+  // Locally persisted so that refreshing or navigating doesn't wipe voter's drafted ballot selections
   const [selectedCandidates, setSelectedCandidates] = useState<
     Record<string, { candidateName: string; candidateId?: string }>
-  >({});
-
-  // Track elections that have been submitted locally for instant 0ms ballot locking
-  const [submittedElections, setSubmittedElections] = useState<
-    Record<string, { candidateNames: string[]; timestamp: number }>
   >(() => {
-    try {
-      const saved = localStorage.getItem(`cv_voted_elections_${currentUser.id}`);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
+    return preferenceStorage.getBallotDraft(currentUser.id);
   });
 
   // Profile fields state
@@ -146,8 +130,10 @@ export default function VoterDashboard({
   const [editGender, setEditGender] = useState("M");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  // Search query for favorite candidates in election voting portal
-  const [voterSearchQueries, setVoterSearchQueries] = useState<Record<string, string>>({});
+  // Search query for favorite candidates in election voting portal - saved locally
+  const [voterSearchQueries, setVoterSearchQueries] = useState<Record<string, string>>(() => {
+    return preferenceStorage.getPreference<Record<string, string>>(`voter_search_${currentUser.id}`, {});
+  });
 
   const normUser = currentUser.username.trim().toLowerCase();
   const linkedStudent = students.find((s) => {
@@ -272,11 +258,7 @@ export default function VoterDashboard({
     electionPositions: any[],
   ) => {
     // Collect all selections for this election
-    const ballotVotes: Array<{
-      positionId: string;
-      candidateName: string;
-      candidateId?: string;
-    }> = [];
+    const ballotVotes: Array<{ positionId: string; candidateName: string; candidateId?: string }> = [];
     for (const pos of electionPositions) {
       const selectionKey = `${electionId}_${pos.id}`;
       const selection = selectedCandidates[selectionKey];
@@ -290,126 +272,41 @@ export default function VoterDashboard({
     }
 
     if (ballotVotes.length === 0) {
-      showToast(
-        "Please select your preferred candidate before submitting your official ballot.",
-      );
+      showToast("Please make at least one candidate selection before submitting your ballot.");
       return;
     }
 
-    // 1. Optimistic vote rows creation for instantaneous UI responsiveness (0ms perceived delay)
-    const optimisticVotes: VoteRow[] = ballotVotes.map((b, i) => ({
-      id: `vote_${Date.now()}_${i}_${Math.floor(Math.random() * 1000)}`,
-      voter_id: currentUser.id,
-      election_id: electionId,
-      position_id: b.positionId,
-      candidate: b.candidateName,
-      candidate_id: b.candidateId,
-      created_at: new Date().toISOString(),
-    }));
-
-    // 2. Immediately mark ballot as submitted and locked in local state and localStorage
-    const updatedSubmitted = {
-      ...submittedElections,
-      [electionId]: {
-        candidateNames: ballotVotes.map((b) => b.candidateName),
-        timestamp: Date.now(),
-      },
-    };
-    setSubmittedElections(updatedSubmitted);
     try {
-      localStorage.setItem(
-        `cv_voted_elections_${currentUser.id}`,
-        JSON.stringify(updatedSubmitted),
-      );
-    } catch (e) {
-      console.warn("Could not save submitted elections to localStorage:", e);
-    }
+      setIsLoading(true);
+      // Cast all votes
+      for (const voteItem of ballotVotes) {
+        await dbService.insertVote(
+          currentUser.id,
+          electionId,
+          voteItem.candidateName,
+          voteItem.positionId,
+          voteItem.candidateId,
+        );
+      }
 
-    // 3. Immediately update cached votes in localStorage and notify parent component
-    try {
-      const currentStoredVotes = getLocalTable<VoteRow>(VOTES_KEY, []);
-      for (const ov of optimisticVotes) {
-        if (
-          !currentStoredVotes.some(
-            (v) =>
-              v.voter_id === ov.voter_id &&
-              v.election_id === ov.election_id &&
-              v.position_id === ov.position_id,
-          )
-        ) {
-          currentStoredVotes.push(ov);
+      // Clear persisted ballot draft for this election
+      preferenceStorage.clearBallotDraft(currentUser.id, electionId);
+      setSelectedCandidates((prev) => {
+        const next = { ...prev };
+        for (const pos of electionPositions) {
+          delete next[`${electionId}_${pos.id}`];
         }
-      }
-      saveLocalTable(VOTES_KEY, currentStoredVotes);
-    } catch (e) {
-      console.warn("Could not save votes to localStorage:", e);
-    }
+        return next;
+      });
 
-    if (onVotesCast) {
-      onVotesCast(optimisticVotes);
-    }
-
-    // 4. Clear selections for this election
-    setSelectedCandidates((prev) => {
-      const copy = { ...prev };
-      for (const pos of electionPositions) {
-        delete copy[`${electionId}_${pos.id}`];
-      }
-      return copy;
-    });
-
-    // 5. Immediate feedback to user
-    showToast(
-      "Thank you for voting! Your official ballot has been securely submitted and verified.",
-    );
-
-    // 6. Background synchronization with database without blocking the UI
-    const votesToInsert = ballotVotes.map((b) => ({
-      voterId: currentUser.id,
-      electionId,
-      candidate: b.candidateName,
-      positionId: b.positionId,
-      candidateId: b.candidateId,
-    }));
-
-    dbService.insertVotesBatch(votesToInsert).catch((err) => {
-      console.warn("Background vote batch insert encountered an error:", err);
-    });
-  };
-
-  // Switch to the next available election or candidate ballot
-  const handleVoteForOtherCandidates = (currentElectionId: string) => {
-    // 1. Search for other active elections where user hasn't voted yet
-    const otherElections = visibleElections.filter((el) => {
-      if (el.id === currentElectionId) return false;
-      const elPositions = getElectionPositions(el);
-      const userVotes = votes.filter(
-        (v) => v.voter_id === currentUser.id && v.election_id === el.id,
-      );
-      const isSub = !!submittedElections[el.id];
-      return !isSub && userVotes.length < elPositions.length;
-    });
-
-    if (otherElections.length > 0) {
-      const nextElection = otherElections[0];
-      const targetEl = document.getElementById(`election-card-${nextElection.id}`);
-      if (targetEl) {
-        targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
-        targetEl.classList.add("ring-4", "ring-[#1565D8]/40");
-        setTimeout(() => {
-          targetEl.classList.remove("ring-4", "ring-[#1565D8]/40");
-        }, 2500);
-      }
+      await refreshDatabaseState();
       showToast(
-        `Switched to open ballot: "${nextElection.title}". Select your candidates below.`,
+        `BALLOT SUCCESS: Your official ballot of ${ballotVotes.length} selection(s) has been securely submitted!`,
       );
-    } else {
-      showToast(
-        "You have completed voting in all available elections! View Live Results or explore student clubs.",
-      );
-      if (onNavigate) {
-        onNavigate("results");
-      }
+    } catch (err: any) {
+      showToast(`SQL ERROR: ${err.message || "Could not cast your bulk ballot."}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -797,21 +694,23 @@ export default function VoterDashboard({
               </div>
             </div>
 
-            <UpdatesFeed
-              currentUser={currentUser}
-              updates={updates}
-              updateLikes={updateLikes}
-              updateComments={updateComments}
-              newUpdateContent=""
-              setNewUpdateContent={() => {}}
-              handleCreateUpdate={() => {}}
-              handleDeleteUpdate={handleDeleteUpdate}
-              handleToggleLikeUpdate={handleToggleLikeUpdate}
-              newCommentContents={newCommentContents}
-              setNewCommentContents={setNewCommentContents}
-              handlePostComment={handlePostComment}
-              isAdmin={false}
-            />
+            <React.Suspense fallback={<div className="p-8 text-center text-xs text-zinc-400">Loading campus updates...</div>}>
+              <UpdatesFeed
+                currentUser={currentUser}
+                updates={updates}
+                updateLikes={updateLikes}
+                updateComments={updateComments}
+                newUpdateContent=""
+                setNewUpdateContent={() => {}}
+                handleCreateUpdate={() => {}}
+                handleDeleteUpdate={handleDeleteUpdate}
+                handleToggleLikeUpdate={handleToggleLikeUpdate}
+                newCommentContents={newCommentContents}
+                setNewCommentContents={setNewCommentContents}
+                handlePostComment={handlePostComment}
+                isAdmin={false}
+              />
+            </React.Suspense>
           </div>
         </div>
       )}
@@ -912,18 +811,12 @@ export default function VoterDashboard({
 
                 const allPositionsVoted =
                   electionPositions.length > 0 &&
-                  votedCount >= electionPositions.length;
-
-                const isBallotClosed =
-                  allPositionsVoted ||
-                  !!submittedElections[election.id] ||
-                  userVotesInElection.length > 0;
+                  votedCount === electionPositions.length;
 
                 return (
                   <div
-                    id={`election-card-${election.id}`}
                     key={election.id}
-                    className="bg-white dark:bg-zinc-900 border border-[#E4E7EC] dark:border-zinc-800 rounded-[16px] p-6 shadow-sm space-y-4 transition-all"
+                    className="bg-white dark:bg-zinc-900 border border-[#E4E7EC] dark:border-zinc-800 rounded-[16px] p-6 shadow-sm space-y-4"
                   >
                     <div>
                       <div className="flex items-start justify-between gap-3 mb-2">
@@ -946,102 +839,37 @@ export default function VoterDashboard({
 
                       <div className="flex items-center gap-2 mt-4 text-[#0E9F6E] dark:text-emerald-400 text-sm font-semibold font-['Montserrat']">
                         <span className="w-2 h-2 rounded-full bg-[#0E9F6E] dark:bg-emerald-400" />
-                        {isBallotClosed ? "Ballot Submitted & Locked" : "Voting open"}
+                        Voting open
                       </div>
                       
                       <div className="mt-6 border-t border-[#E4E7EC] dark:border-zinc-800 pt-5">
-                        {isBallotClosed ? (
-                          <div className="rounded-2xl bg-gradient-to-br from-emerald-50/90 via-teal-50/60 to-emerald-100/40 dark:from-emerald-950/40 dark:via-zinc-900 dark:to-teal-950/30 border border-emerald-300/80 dark:border-emerald-800/80 p-6 text-center space-y-5 shadow-xs">
-                            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-inner ring-8 ring-emerald-50 dark:ring-emerald-950/30">
-                              <CheckCircle2 className="w-9 h-9 stroke-[2.2]" />
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <span className="inline-block text-[11px] font-black uppercase tracking-widest bg-emerald-200/80 dark:bg-emerald-900/80 text-emerald-900 dark:text-emerald-200 px-3 py-1 rounded-full">
-                                Ballot Verified & Locked
-                              </span>
-                              <h4 className="text-2xl font-black text-emerald-950 dark:text-emerald-100 font-['Poppins'] tracking-tight">
-                                Thank You for Voting!
-                              </h4>
-                              <p className="text-xs text-emerald-800/80 dark:text-emerald-300/80 font-['Montserrat'] max-w-md mx-auto leading-relaxed">
-                                Your official vote has been encrypted and recorded in the election registry. The ballot is now closed to prevent duplicate voting.
-                              </p>
-                            </div>
-
-                            {/* Verified Ballot Selections */}
-                            <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-2xl p-4 border border-emerald-200/70 dark:border-emerald-900/50 text-left max-w-md mx-auto shadow-xs space-y-2.5">
-                              <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                                <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                                  Your Verified Selections:
-                                </span>
-                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                                  <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" /> Encrypted
-                                </span>
-                              </div>
-
-                              {electionPositions.map((pos) => {
-                                const voteForPos = userVotesInElection.find(
-                                  (v) =>
-                                    (v.position_id && v.position_id === pos.id) ||
-                                    (!v.position_id &&
-                                      pos.candidates.some((c) => c.name === v.candidate)),
-                                );
-                                const chosenCandidateName =
-                                  voteForPos?.candidate ||
-                                  submittedElections[election.id]?.candidateNames?.[0] ||
-                                  "Vote Recorded";
-                                return (
-                                  <div
-                                    key={pos.id}
-                                    className="flex items-center justify-between text-xs py-1.5 border-b border-zinc-100/60 dark:border-zinc-800/60 last:border-b-0"
-                                  >
-                                    <span className="font-semibold text-zinc-700 dark:text-zinc-300 font-['Poppins']">
-                                      {pos.title}
-                                    </span>
-                                    <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg">
-                                      <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                                      {chosenCandidateName}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-
-                            {/* Button below to vote for other candidates */}
-                            <div className="pt-2 flex flex-col items-center gap-2">
-                              <button
-                                type="button"
-                                id={`vote-other-btn-${election.id}`}
-                                onClick={() => handleVoteForOtherCandidates(election.id)}
-                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-[#1565D8] hover:bg-[#0D5BE1] active:scale-[0.98] text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-blue-500/20 cursor-pointer"
-                              >
-                                <Vote className="w-4 h-4 stroke-[2.5]" />
-                                <span>Vote for other candidates</span>
-                              </button>
-                              <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
-                                Click to proceed to other open election ballots or explore clubs.
-                              </p>
-                            </div>
+                        {!allPositionsVoted && (
+                          <div className="relative mb-5">
+                            <Search className="absolute left-3.5 top-3 w-4 h-4 text-zinc-400 pointer-events-none" />
+                            <input
+                              type="text"
+                              placeholder="Search your favorite candidate by name..."
+                              value={voterSearchQueries[election.id] || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setVoterSearchQueries((prev) => {
+                                  const next = { ...prev, [election.id]: val };
+                                  preferenceStorage.setPreference(`voter_search_${currentUser.id}`, next);
+                                  return next;
+                                });
+                              }}
+                              className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:border-[#1565D8] focus:ring-1 focus:ring-[#1565D8] focus:outline-none text-xs text-zinc-950 dark:text-zinc-100 placeholder-zinc-400"
+                            />
                           </div>
-                        ) : (
-                          <div>
-                            <div className="relative mb-5">
-                              <Search className="absolute left-3.5 top-3 w-4 h-4 text-zinc-400 pointer-events-none" />
-                              <input
-                                type="text"
-                                placeholder="Search your favorite candidate by name..."
-                                value={voterSearchQueries[election.id] || ""}
-                                onChange={(e) => {
-                                  setVoterSearchQueries((prev) => ({
-                                    ...prev,
-                                    [election.id]: e.target.value,
-                                  }));
-                                }}
-                                className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:border-[#1565D8] focus:ring-1 focus:ring-[#1565D8] focus:outline-none text-xs text-zinc-950 dark:text-zinc-100 placeholder-zinc-400"
-                              />
-                            </div>
+                        )}
 
-                            <div className="space-y-8">
+                        {allPositionsVoted ? (
+                           <div className="w-full py-4 bg-[#E8F8F1] dark:bg-emerald-950/20 border border-[#0E9F6E]/30 text-[#0E9F6E] dark:text-emerald-400 text-center font-bold text-sm rounded-2xl flex items-center justify-center gap-2">
+                             <Check className="w-5 h-5 font-black" />
+                             <span>Official Ballot Submitted & Verified</span>
+                           </div>
+                        ) : (
+                          <div className="space-y-8">
                              {electionPositions.map((pos) => {
                                const existingVote = userVotesInElection.find(
                                  (v) =>
@@ -1087,13 +915,15 @@ export default function VoterDashboard({
                                               <div
                                                 key={cand.id}
                                                 onClick={() => {
-                                                  setSelectedCandidates((prev) => ({
-                                                    ...prev,
+                                                  const updated = {
+                                                    ...selectedCandidates,
                                                     [selectionKey]: {
                                                       candidateName: cand.name,
                                                       candidateId: cand.id,
                                                     },
-                                                  }));
+                                                  };
+                                                  setSelectedCandidates(updated);
+                                                  preferenceStorage.setBallotDraft(currentUser.id, updated);
                                                 }}
                                                 className={`relative rounded-3xl border overflow-hidden transition-all duration-200 cursor-pointer flex flex-col ${
                                                   currentSelection?.candidateName === cand.name
@@ -1171,7 +1001,6 @@ export default function VoterDashboard({
                                  Your selections will be permanently locked and submitted securely to the verified election records.
                                </p>
                              </div>
-                          </div>
                           </div>
                         )}
                       </div>
@@ -1370,21 +1199,23 @@ export default function VoterDashboard({
       )}
 
       {activeTab === "updates" && (
-        <UpdatesFeed
-          currentUser={currentUser}
-          updates={updates}
-          updateLikes={updateLikes}
-          updateComments={updateComments}
-          newUpdateContent=""
-          setNewUpdateContent={() => {}}
-          handleCreateUpdate={() => {}}
-          handleDeleteUpdate={handleDeleteUpdate}
-          handleToggleLikeUpdate={handleToggleLikeUpdate}
-          newCommentContents={newCommentContents}
-          setNewCommentContents={setNewCommentContents}
-          handlePostComment={handlePostComment}
-          isAdmin={false}
-        />
+        <React.Suspense fallback={<div className="p-8 text-center text-xs text-zinc-400">Loading campus updates...</div>}>
+          <UpdatesFeed
+            currentUser={currentUser}
+            updates={updates}
+            updateLikes={updateLikes}
+            updateComments={updateComments}
+            newUpdateContent=""
+            setNewUpdateContent={() => {}}
+            handleCreateUpdate={() => {}}
+            handleDeleteUpdate={handleDeleteUpdate}
+            handleToggleLikeUpdate={handleToggleLikeUpdate}
+            newCommentContents={newCommentContents}
+            setNewCommentContents={setNewCommentContents}
+            handlePostComment={handlePostComment}
+            isAdmin={false}
+          />
+        </React.Suspense>
       )}
 
       {activeTab === "profile" &&

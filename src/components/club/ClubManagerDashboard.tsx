@@ -23,7 +23,9 @@ import {
   UpdateCommentRow,
 } from "../../types.ts";
 import { dbService, getElectionPositions } from "../../lib/supabase.ts";
-import UpdatesFeed from "../shared/UpdatesFeed.tsx";
+
+// Lazy load feed for optimal performance
+const UpdatesFeed = React.lazy(() => import("../shared/UpdatesFeed.tsx"));
 
 interface ClubManagerDashboardProps {
   currentUser: LoggedInUser;
@@ -726,21 +728,23 @@ export default function ClubManagerDashboard({
           {/* TAB: FEED */}
           {activeTab === "feed" && (
             <div className="space-y-6">
-              <UpdatesFeed
-                currentUser={currentUser}
-                updates={updates}
-                updateLikes={updateLikes}
-                updateComments={updateComments}
-                newUpdateContent=""
-                setNewUpdateContent={() => {}}
-                handleCreateUpdate={() => {}}
-                handleDeleteUpdate={handleDeleteUpdate}
-                handleToggleLikeUpdate={handleToggleLikeUpdate}
-                newCommentContents={newCommentContents}
-                setNewCommentContents={setNewCommentContents}
-                handlePostComment={handlePostComment}
-                isAdmin={false}
-              />
+              <React.Suspense fallback={<div className="p-8 text-center text-xs text-zinc-400">Loading campus feed...</div>}>
+                <UpdatesFeed
+                  currentUser={currentUser}
+                  updates={updates}
+                  updateLikes={updateLikes}
+                  updateComments={updateComments}
+                  newUpdateContent=""
+                  setNewUpdateContent={() => {}}
+                  handleCreateUpdate={() => {}}
+                  handleDeleteUpdate={handleDeleteUpdate}
+                  handleToggleLikeUpdate={handleToggleLikeUpdate}
+                  newCommentContents={newCommentContents}
+                  setNewCommentContents={setNewCommentContents}
+                  handlePostComment={handlePostComment}
+                  isAdmin={false}
+                />
+              </React.Suspense>
             </div>
           )}
 
