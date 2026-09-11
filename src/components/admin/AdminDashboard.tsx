@@ -149,9 +149,20 @@ interface AdminDashboardProps {
 
   // General helpers
   truncateDatabase: () => void;
-  refreshDatabaseState: () => Promise<void>;
+  refreshDatabaseState: (
+    specificTable?: "elections" | "voters" | "votes" | "students" | "clubs" | "updates",
+    force?: boolean,
+  ) => Promise<void>;
   showToast: (msg: string) => void;
   setIsLoading: (val: boolean) => void;
+
+  // State setters for optimistic UI
+  setElections?: React.Dispatch<React.SetStateAction<ElectionRow[]>>;
+  setVoters?: React.Dispatch<React.SetStateAction<VoterRow[]>>;
+  setStudents?: React.Dispatch<React.SetStateAction<StudentRow[]>>;
+  setClubs?: React.Dispatch<React.SetStateAction<ClubRow[]>>;
+  setClubMembers?: React.Dispatch<React.SetStateAction<ClubMemberRow[]>>;
+  setUpdates?: React.Dispatch<React.SetStateAction<UpdateRow[]>>;
 }
 
 export default function AdminDashboard({
@@ -219,6 +230,12 @@ export default function AdminDashboard({
   refreshDatabaseState,
   showToast,
   setIsLoading,
+  setElections,
+  setVoters,
+  setStudents,
+  setClubs,
+  setClubMembers,
+  setUpdates,
 }: AdminDashboardProps) {
   // Create New Election State & Flow
   const [showCreateElectionForm, setShowCreateElectionForm] = useState<boolean>(false);
@@ -239,7 +256,6 @@ export default function AdminDashboard({
 
     try {
       setIsSubmittingElection(true);
-      setIsLoading(true);
 
       // Initialize with standard executive positions if checked
       const initialPositions: Position[] = initializeDefaultRoles
@@ -266,7 +282,11 @@ export default function AdminDashboard({
         initialPositions
       );
 
-      await refreshDatabaseState();
+      // Optimistically add to elections list
+      if (setElections) {
+        setElections((prev) => [created, ...prev]);
+      }
+      refreshDatabaseState("elections", true);
       showToast(`Election "${created.title}" saved successfully! Proceeding to Candidates menu.`);
 
       // Reset state
@@ -281,7 +301,6 @@ export default function AdminDashboard({
       showToast(`Error creating election: ${err.message}`);
     } finally {
       setIsSubmittingElection(false);
-      setIsLoading(false);
     }
   };
 
@@ -311,24 +330,26 @@ export default function AdminDashboard({
     }
 
     try {
-      setIsLoading(true);
       const updateData: Partial<VoterRow> = { username: profileUsername };
       if (profilePassword) {
         updateData.password = profilePassword;
       }
 
       await dbService.updateVoter(currentUser.id, updateData);
+      if (setVoters) {
+        setVoters((prev) =>
+          prev.map((v) => (v.id === currentUser.id ? { ...v, ...updateData } : v)),
+        );
+      }
+      refreshDatabaseState("voters", true);
       showToast("Profile credentials updated successfully.");
       setProfileMessage(
         "Your credentials have been updated. Changes will apply immediately.",
       );
       setProfilePassword("");
       setProfileConfirmPassword("");
-      await refreshDatabaseState();
     } catch (err: any) {
       setProfileError(err.message || "Failed to update profile.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -804,6 +825,14 @@ export default function AdminDashboard({
             setActiveMenu={setActiveMenu}
             initialElectionId={candidateElectionId || undefined}
             onClearInitialElectionId={() => setCandidateElectionId(null)}
+            onUpdateElectionLocally={(id, upd) =>
+              setElections?.((prev) =>
+                prev.map((e) => (e.id === id ? { ...e, ...upd } : e)),
+              )
+            }
+            onAddElectionLocally={(newElection) =>
+              setElections?.((prev) => [newElection, ...prev])
+            }
           />
         </React.Suspense>
       )}
@@ -1679,6 +1708,15 @@ export default function AdminDashboard({
             refreshDatabaseState={refreshDatabaseState}
             showToast={showToast}
             setIsLoading={setIsLoading}
+            onAddStudentLocally={(s) => setStudents?.((prev) => [s, ...prev])}
+            onUpdateStudentLocally={(id, upd) =>
+              setStudents?.((prev) =>
+                prev.map((s) => (s.id === id ? { ...s, ...upd } : s)),
+              )
+            }
+            onRemoveStudentLocally={(id) =>
+              setStudents?.((prev) => prev.filter((s) => s.id !== id))
+            }
           />
         </React.Suspense>
       )}

@@ -173,10 +173,18 @@ function setCachedData<T>(key: string, data: T): void {
 export function invalidateDBCache(key?: string): void {
   if (key) {
     delete dbCache[key];
+    try {
+      localStorage.removeItem(`campusvote_cache_${key}`);
+    } catch {}
   } else {
     for (const k in dbCache) {
       delete dbCache[k];
     }
+    try {
+      Object.values(CACHE_KEYS).forEach((cacheKey) => {
+        localStorage.removeItem(cacheKey);
+      });
+    } catch {}
   }
 }
 
@@ -341,8 +349,11 @@ export async function initializeDatabase() {
 // Unified Database CRUD wrapper
 export const dbService = {
   // ELECTIONS
-  async getElections(): Promise<ElectionRow[]> {
-    const cached = getCachedData<ElectionRow[]>("elections");
+  async getElections(forceRefresh = false): Promise<ElectionRow[]> {
+    if (forceRefresh) {
+      invalidateDBCache("elections");
+    }
+    const cached = !forceRefresh ? getCachedData<ElectionRow[]>("elections") : null;
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -372,7 +383,7 @@ export const dbService = {
     status: "draft" | "active" | "completed" = "draft",
     positions: Position[] = [],
   ): Promise<ElectionRow> {
-    invalidateDBCache();
+    invalidateDBCache("elections");
     const id = "elec_" + Math.floor(Math.random() * 1000000).toString();
     const newElection: ElectionRow = {
       id,
@@ -406,7 +417,7 @@ export const dbService = {
     id: string,
     updates: Partial<ElectionRow>,
   ): Promise<void> {
-    invalidateDBCache();
+    invalidateDBCache("elections");
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("elections")
@@ -424,7 +435,8 @@ export const dbService = {
   },
 
   async deleteElection(id: string): Promise<void> {
-    invalidateDBCache();
+    invalidateDBCache("elections");
+    invalidateDBCache("votes");
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.from("elections").delete().eq("id", id);
       if (error) throw error;
@@ -442,8 +454,11 @@ export const dbService = {
   },
 
   // VOTERS
-  async getVoters(): Promise<VoterRow[]> {
-    const cached = getCachedData<VoterRow[]>("voters");
+  async getVoters(forceRefresh = false): Promise<VoterRow[]> {
+    if (forceRefresh) {
+      invalidateDBCache("voters");
+    }
+    const cached = !forceRefresh ? getCachedData<VoterRow[]>("voters") : null;
     if (cached) return cached;
 
     if (isSupabaseConfigured && supabase) {
@@ -465,7 +480,7 @@ export const dbService = {
     password?: string,
     role: "voter" | "club_manager" | "admin" = "voter",
   ): Promise<VoterRow> {
-    invalidateDBCache();
+    invalidateDBCache("voters");
     const id = "voter_" + Math.floor(Math.random() * 1000000).toString();
     const newVoter: VoterRow = {
       id,
@@ -509,7 +524,7 @@ export const dbService = {
   },
 
   async updateVoter(id: string, updates: Partial<VoterRow>): Promise<void> {
-    invalidateDBCache();
+    invalidateDBCache("voters");
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("voters")
@@ -540,7 +555,8 @@ export const dbService = {
   },
 
   async deleteVoter(id: string): Promise<void> {
-    invalidateDBCache();
+    invalidateDBCache("voters");
+    invalidateDBCache("votes");
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.from("voters").delete().eq("id", id);
       if (error) throw error;
@@ -558,8 +574,11 @@ export const dbService = {
   },
 
   // VOTES (Relational Junction)
-  async getVotes(voterId?: string): Promise<VoteRow[]> {
-    const cached = getCachedData<VoteRow[]>("votes");
+  async getVotes(voterId?: string, forceRefresh = false): Promise<VoteRow[]> {
+    if (forceRefresh) {
+      invalidateDBCache("votes");
+    }
+    const cached = !forceRefresh ? getCachedData<VoteRow[]>("votes") : null;
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -597,7 +616,7 @@ export const dbService = {
     positionId: string = "general",
     candidateId?: string,
   ): Promise<VoteRow> {
-    invalidateDBCache();
+    invalidateDBCache("votes");
     const id = "vote_" + Math.floor(Math.random() * 1000000).toString();
     const newVote: VoteRow = {
       id,
@@ -649,7 +668,7 @@ export const dbService = {
       candidateId?: string;
     }>,
   ): Promise<VoteRow[]> {
-    invalidateDBCache();
+    invalidateDBCache("votes");
     const newVotes: VoteRow[] = votesToInsert.map((v, i) => ({
       id: `vote_${Math.floor(Math.random() * 1000000)}_${i}`,
       voter_id: v.voterId,
@@ -693,8 +712,11 @@ export const dbService = {
   },
 
   // ELECTION UPDATES FEED
-  async getUpdates(): Promise<UpdateRow[]> {
-    const cached = getCachedData<UpdateRow[]>("updates");
+  async getUpdates(forceRefresh = false): Promise<UpdateRow[]> {
+    if (forceRefresh) {
+      invalidateDBCache("updates");
+    }
+    const cached = !forceRefresh ? getCachedData<UpdateRow[]>("updates") : null;
     if (cached) return cached;
 
     if (isSupabaseConfigured && supabase) {
@@ -718,7 +740,7 @@ export const dbService = {
     author: string,
     media_url?: string,
   ): Promise<UpdateRow> {
-    invalidateDBCache();
+    invalidateDBCache("updates");
     const id = "upd_" + Math.floor(Math.random() * 1000000).toString();
     const newUpdate: UpdateRow = {
       id,
@@ -745,7 +767,7 @@ export const dbService = {
   },
 
   async deleteUpdate(id: string): Promise<void> {
-    invalidateDBCache();
+    invalidateDBCache("updates");
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.from("updates").delete().eq("id", id);
       if (error) throw error;
@@ -875,8 +897,11 @@ export const dbService = {
   },
 
   // CLUBS
-  async getClubs(): Promise<ClubRow[]> {
-    const cached = getCachedData<ClubRow[]>("clubs");
+  async getClubs(forceRefresh = false): Promise<ClubRow[]> {
+    if (forceRefresh) {
+      invalidateDBCache("clubs");
+    }
+    const cached = !forceRefresh ? getCachedData<ClubRow[]>("clubs") : null;
     if (cached) return cached;
 
     if (isSupabaseConfigured && supabase) {
@@ -898,7 +923,7 @@ export const dbService = {
     description: string,
     managerId: string | null,
   ): Promise<ClubRow> {
-    invalidateDBCache();
+    invalidateDBCache("clubs");
     const id = "club_" + Math.floor(Math.random() * 1000000).toString();
     const newClub: ClubRow = {
       id,
@@ -925,6 +950,7 @@ export const dbService = {
   },
 
   async updateClub(id: string, updates: Partial<ClubRow>): Promise<void> {
+    invalidateDBCache("clubs");
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("clubs")
@@ -940,7 +966,8 @@ export const dbService = {
   },
 
   async deleteClub(id: string): Promise<void> {
-    invalidateDBCache();
+    invalidateDBCache("clubs");
+    invalidateDBCache("club_members");
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.from("clubs").delete().eq("id", id);
       if (error) throw error;
@@ -957,8 +984,11 @@ export const dbService = {
   },
 
   // CLUB MEMBERS
-  async getClubMembers(clubId?: string): Promise<ClubMemberRow[]> {
-    const cached = getCachedData<ClubMemberRow[]>("club_members");
+  async getClubMembers(clubId?: string, forceRefresh = false): Promise<ClubMemberRow[]> {
+    if (forceRefresh) {
+      invalidateDBCache("club_members");
+    }
+    const cached = !forceRefresh ? getCachedData<ClubMemberRow[]>("club_members") : null;
     if (cached) {
       if (clubId) {
         return cached.filter((m) => m.club_id === clubId);
@@ -990,7 +1020,7 @@ export const dbService = {
   },
 
   async setClubMembers(clubId: string, voterIds: string[]): Promise<void> {
-    invalidateDBCache();
+    invalidateDBCache("club_members");
     if (isSupabaseConfigured && supabase) {
       const { error: delError } = await supabase
         .from("club_members")
@@ -1025,8 +1055,11 @@ export const dbService = {
   },
 
   // STUDENTS
-  async getStudents(): Promise<StudentRow[]> {
-    const cached = getCachedData<StudentRow[]>("students");
+  async getStudents(forceRefresh = false): Promise<StudentRow[]> {
+    if (forceRefresh) {
+      invalidateDBCache("students");
+    }
+    const cached = !forceRefresh ? getCachedData<StudentRow[]>("students") : null;
     if (cached) return cached;
 
     if (isSupabaseConfigured && supabase) {
@@ -1046,7 +1079,7 @@ export const dbService = {
   async insertStudent(
     student: Omit<StudentRow, "id" | "uploaded_at">,
   ): Promise<StudentRow> {
-    invalidateDBCache();
+    invalidateDBCache("students");
 
     if (isSupabaseConfigured && supabase) {
       const payload = {
@@ -1099,7 +1132,7 @@ export const dbService = {
   },
 
   async deleteStudent(id: string): Promise<void> {
-    invalidateDBCache();
+    invalidateDBCache("students");
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.from("students").delete().eq("id", id);
       if (error) throw error;
@@ -1113,7 +1146,7 @@ export const dbService = {
   },
 
   async approveStudent(id: string): Promise<void> {
-    invalidateDBCache();
+    invalidateDBCache("students");
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("students")
@@ -1131,7 +1164,7 @@ export const dbService = {
   },
 
   async linkStudentEmail(id: string, email: string): Promise<void> {
-    invalidateDBCache();
+    invalidateDBCache("students");
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("students")
@@ -1159,7 +1192,7 @@ export const dbService = {
       cum_number?: string;
     }
   ): Promise<void> {
-    invalidateDBCache();
+    invalidateDBCache("students");
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase
         .from("students")
@@ -1179,6 +1212,7 @@ export const dbService = {
   async importStudentsBulk(
     students: Omit<StudentRow, "id" | "uploaded_at">[],
   ): Promise<void> {
+    invalidateDBCache("students");
     if (isSupabaseConfigured && supabase) {
       const insertPayload = students.map((s) => ({
         program_name: s.program_name,

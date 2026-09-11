@@ -22,9 +22,15 @@ import { getUserAvatarUrl } from "../../lib/avatar.ts";
 
 interface StudentsManagerProps {
   students: StudentRow[];
-  refreshDatabaseState: () => Promise<void>;
+  refreshDatabaseState: (
+    specificTable?: "elections" | "voters" | "votes" | "students" | "clubs" | "updates",
+    force?: boolean,
+  ) => Promise<void>;
   showToast: (msg: string) => void;
   setIsLoading: (val: boolean) => void;
+  onAddStudentLocally?: (student: StudentRow) => void;
+  onUpdateStudentLocally?: (id: string, updates: Partial<StudentRow>) => void;
+  onRemoveStudentLocally?: (id: string) => void;
 }
 
 export default function StudentsManager({
@@ -32,6 +38,9 @@ export default function StudentsManager({
   refreshDatabaseState,
   showToast,
   setIsLoading,
+  onAddStudentLocally,
+  onUpdateStudentLocally,
+  onRemoveStudentLocally,
 }: StudentsManagerProps) {
   // Modal / Form trigger states
   const [isAddingSingle, setIsAddingSingle] = useState(false);
@@ -98,8 +107,7 @@ export default function StudentsManager({
     }
 
     try {
-      setIsLoading(true);
-      await dbService.insertStudent({
+      const created = await dbService.insertStudent({
         program_name: programName.trim(),
         academic_year: academicYear.trim(),
         registration_number: registrationNumber.trim(),
@@ -108,6 +116,9 @@ export default function StudentsManager({
         first_name: firstName.trim(),
         gender: gender.trim(),
       });
+      if (onAddStudentLocally) {
+        onAddStudentLocally(created);
+      }
       showToast(`Student ${firstName} ${surname} created successfully!`);
 
       // Reset form & state
@@ -120,11 +131,9 @@ export default function StudentsManager({
       setGender("M");
       setIsAddingSingle(false);
 
-      await refreshDatabaseState();
+      refreshDatabaseState("students", true);
     } catch (err: any) {
       showToast(`Creation error: ${err.message || "Failed to add student"}`);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -267,7 +276,7 @@ export default function StudentsManager({
       setPreviewRows([]);
       setCsvText("");
       setIsUploadingCSV(false);
-      await refreshDatabaseState();
+      refreshDatabaseState("students", true);
     } catch (err: any) {
       setImportLogs({
         error: `Import failed: ${err.message || "Unique conflict on registration number keys."}`,
@@ -283,29 +292,33 @@ export default function StudentsManager({
       return;
     }
 
+    if (onRemoveStudentLocally) {
+      onRemoveStudentLocally(id);
+    }
+    showToast(`Student "${name}" deleted.`);
+
     try {
-      setIsLoading(true);
       await dbService.deleteStudent(id);
-      showToast(`Student "${name}" deleted.`);
-      await refreshDatabaseState();
+      refreshDatabaseState("students", true);
     } catch (err: any) {
       showToast(`Delete failed: ${err.message}`);
-    } finally {
-      setIsLoading(false);
+      refreshDatabaseState("students", true);
     }
   };
 
   // Approve student handler
   const handleApproveStudent = async (id: string, name: string) => {
+    if (onUpdateStudentLocally) {
+      onUpdateStudentLocally(id, { status: "approved" });
+    }
+    showToast(`Student record for "${name}" approved successfully.`);
+
     try {
-      setIsLoading(true);
       await dbService.approveStudent(id);
-      showToast(`Student record for "${name}" approved successfully.`);
-      await refreshDatabaseState();
+      refreshDatabaseState("students", true);
     } catch (err: any) {
       showToast(`Approval failed: ${err.message}`);
-    } finally {
-      setIsLoading(false);
+      refreshDatabaseState("students", true);
     }
   };
 
@@ -321,17 +334,19 @@ export default function StudentsManager({
       return;
     }
 
+    if (onUpdateStudentLocally) {
+      onUpdateStudentLocally(linkingStudentId, { email: targetEmail });
+    }
+    showToast("Successfully linked student record to Google email.");
+    setLinkingStudentId(null);
+    setManualEmailInput("");
+
     try {
-      setIsLoading(true);
       await dbService.linkStudentEmail(linkingStudentId, targetEmail);
-      showToast("Successfully linked student record to Google email.");
-      setLinkingStudentId(null);
-      setManualEmailInput("");
-      await refreshDatabaseState();
+      refreshDatabaseState("students", true);
     } catch (err: any) {
       showToast(`Linkage failed: ${err.message}`);
-    } finally {
-      setIsLoading(false);
+      refreshDatabaseState("students", true);
     }
   };
 

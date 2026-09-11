@@ -28,12 +28,17 @@ import { LargeFileUploader } from "../shared/LargeFileUploader.tsx";
 
 interface CandidatesManagerProps {
   elections: ElectionRow[];
-  onRefresh: () => Promise<void>;
+  onRefresh: (
+    specificTable?: "elections" | "voters" | "votes" | "students" | "clubs" | "updates",
+    force?: boolean,
+  ) => Promise<void>;
   showToast: (msg: string) => void;
   setIsLoading: (val: boolean) => void;
   setActiveMenu: (menu: string) => void;
   initialElectionId?: string;
   onClearInitialElectionId?: () => void;
+  onUpdateElectionLocally?: (electionId: string, updates: Partial<ElectionRow>) => void;
+  onAddElectionLocally?: (election: ElectionRow) => void;
 }
 
 // Sample avatars for quick testing if user wants immediate presets
@@ -83,6 +88,8 @@ export default function CandidatesManager({
   setActiveMenu,
   initialElectionId,
   onClearInitialElectionId,
+  onUpdateElectionLocally,
+  onAddElectionLocally,
 }: CandidatesManagerProps) {
   // Navigation State
   const [currentStep, setCurrentStep] = useState<WorkflowStep>(() => {
@@ -178,27 +185,34 @@ export default function CandidatesManager({
   // Helper to persist updated positions
   const savePositionsToElection = async (updatedPositions: Position[]) => {
     if (!currentElection) return;
-    try {
-      setIsLoading(true);
-      const flatCandidates = updatedPositions.flatMap((p) =>
-        p.candidates.map((c) => ({
-          id: c.id,
-          name: c.name,
-          photo_url: c.photo_url,
-          manifesto: c.manifesto,
-        }))
-      );
+    const flatCandidates = updatedPositions.flatMap((p) =>
+      p.candidates.map((c) => ({
+        id: c.id,
+        name: c.name,
+        photo_url: c.photo_url,
+        manifesto: c.manifesto,
+      }))
+    );
 
+    // Optimistically update parent election state immediately in React
+    if (onUpdateElectionLocally) {
+      onUpdateElectionLocally(currentElection.id, {
+        positions: updatedPositions,
+        candidates: flatCandidates,
+      });
+    }
+
+    try {
       await dbService.updateElection(currentElection.id, {
         positions: updatedPositions,
         candidates: flatCandidates,
       });
-      await onRefresh();
+      // Targeted background refresh of elections table only
+      onRefresh("elections", true);
     } catch (err: any) {
       showToast(`Error saving: ${err.message}`);
+      onRefresh("elections", true);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -233,7 +247,10 @@ export default function CandidatesManager({
         defaultPositions
       );
 
-      await onRefresh();
+      if (onAddElectionLocally) {
+        onAddElectionLocally(created);
+      }
+      onRefresh("elections", true);
       setSelectedElectionId(created.id);
       setCurrentStep("election_hub");
       showToast('Created "CUNIMA Guild Council Elections 2026"!');
@@ -280,7 +297,10 @@ export default function CandidatesManager({
         defaultPositions
       );
 
-      await onRefresh();
+      if (onAddElectionLocally) {
+        onAddElectionLocally(created);
+      }
+      onRefresh("elections", true);
       setSelectedElectionId(created.id);
       setIsCreatingCustomElection(false);
       setCustomElectionTitle("");

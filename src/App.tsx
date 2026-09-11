@@ -239,29 +239,29 @@ export default function App() {
   };
 
   // Granular on-demand data loaders to only fetch what the user is currently using
-  const loadElectionsData = async () => {
+  const loadElectionsData = async (forceRefresh = false) => {
     try {
-      const data = await dbService.getElections();
+      const data = await dbService.getElections(forceRefresh);
       setElections(data);
     } catch (e) {
       console.warn("Could not load elections:", e);
     }
   };
 
-  const loadVotesData = async () => {
+  const loadVotesData = async (forceRefresh = false) => {
     try {
-      const data = await dbService.getVotes();
+      const data = await dbService.getVotes(undefined, forceRefresh);
       setVotes(data);
     } catch (e) {
       console.warn("Could not load votes:", e);
     }
   };
 
-  const loadClubsData = async () => {
+  const loadClubsData = async (forceRefresh = false) => {
     try {
       const [allClubs, allClubMembers] = await Promise.all([
-        dbService.getClubs(),
-        dbService.getClubMembers(),
+        dbService.getClubs(forceRefresh),
+        dbService.getClubMembers(undefined, forceRefresh),
       ]);
       setClubs(allClubs);
       setClubMembers(allClubMembers);
@@ -270,9 +270,9 @@ export default function App() {
     }
   };
 
-  const loadUpdatesData = async () => {
+  const loadUpdatesData = async (forceRefresh = false) => {
     try {
-      const allUpdates = await dbService.getUpdates();
+      const allUpdates = await dbService.getUpdates(forceRefresh);
       setUpdates(allUpdates);
       // Fetch social details for updates
       const likesMap: Record<string, UpdateLikeRow[]> = {};
@@ -294,18 +294,18 @@ export default function App() {
     }
   };
 
-  const loadStudentsData = async () => {
+  const loadStudentsData = async (forceRefresh = false) => {
     try {
-      const data = await dbService.getStudents();
+      const data = await dbService.getStudents(forceRefresh);
       setStudents(data);
     } catch (e) {
       console.warn("Could not load students:", e);
     }
   };
 
-  const loadVotersData = async () => {
+  const loadVotersData = async (forceRefresh = false) => {
     try {
-      const data = await dbService.getVoters();
+      const data = await dbService.getVoters(forceRefresh);
       setVoters(data);
     } catch (e) {
       console.warn("Could not load voters:", e);
@@ -313,39 +313,49 @@ export default function App() {
   };
 
   // Targeted sync with database - strictly loads only what the user is currently using
-  const refreshDatabaseState = async () => {
+  const refreshDatabaseState = async (
+    specificTable?: "elections" | "voters" | "votes" | "students" | "clubs" | "updates",
+    force = false,
+  ) => {
     try {
+      if (specificTable === "elections") return await loadElectionsData(force);
+      if (specificTable === "voters") return await loadVotersData(force);
+      if (specificTable === "votes") return await loadVotesData(force);
+      if (specificTable === "students") return await loadStudentsData(force);
+      if (specificTable === "clubs") return await loadClubsData(force);
+      if (specificTable === "updates") return await loadUpdatesData(force);
+
       if (!currentUser) {
-        await loadElectionsData();
+        await loadElectionsData(force);
         return;
       }
 
       if (currentUser.role === "voter") {
-        const tasks: Promise<any>[] = [loadElectionsData(), loadVotesData()];
-        if (activeMenu === "clubs") tasks.push(loadClubsData());
-        if (activeMenu === "updates") tasks.push(loadUpdatesData());
-        if (activeMenu === "profile" && students.length === 0) tasks.push(loadStudentsData());
+        const tasks: Promise<any>[] = [loadElectionsData(force), loadVotesData(force)];
+        if (activeMenu === "clubs") tasks.push(loadClubsData(force));
+        if (activeMenu === "updates") tasks.push(loadUpdatesData(force));
+        if (activeMenu === "profile" && students.length === 0) tasks.push(loadStudentsData(force));
         await Promise.all(tasks);
         return;
       }
 
       if (currentUser.role === "club_manager") {
         const tasks: Promise<any>[] = [
-          loadElectionsData(),
-          loadVotesData(),
-          loadClubsData(),
+          loadElectionsData(force),
+          loadVotesData(force),
+          loadClubsData(force),
         ];
-        if (activeMenu === "club_updates") tasks.push(loadUpdatesData());
+        if (activeMenu === "club_updates") tasks.push(loadUpdatesData(force));
         await Promise.all(tasks);
         return;
       }
 
       if (currentUser.role === "admin") {
-        const tasks: Promise<any>[] = [loadElectionsData(), loadVotesData()];
-        if (activeMenu === "students") tasks.push(loadStudentsData());
-        if (activeMenu === "voters") tasks.push(loadVotersData());
-        if (activeMenu === "clubs") tasks.push(loadClubsData());
-        if (activeMenu === "updates") tasks.push(loadUpdatesData());
+        const tasks: Promise<any>[] = [loadElectionsData(force), loadVotesData(force)];
+        if (activeMenu === "students") tasks.push(loadStudentsData(force));
+        if (activeMenu === "voters") tasks.push(loadVotersData(force));
+        if (activeMenu === "clubs") tasks.push(loadClubsData(force));
+        if (activeMenu === "updates") tasks.push(loadUpdatesData(force));
         await Promise.all(tasks);
         return;
       }
@@ -1001,8 +1011,7 @@ export default function App() {
     const legacyCandidates = validPositions.flatMap((p) => p.candidates);
 
     try {
-      setAppLoading(true);
-      await dbService.insertElection(
+      const created = await dbService.insertElection(
         newElectionTitle.trim(),
         newElectionDesc.trim(),
         legacyCandidates,
@@ -1010,7 +1019,8 @@ export default function App() {
         "draft",
         validPositions,
       );
-      await refreshDatabaseState();
+      setElections((prev) => [created, ...prev]);
+      refreshDatabaseState("elections", true);
 
       setNewElectionTitle("");
       setNewElectionDesc("");
@@ -1029,11 +1039,9 @@ export default function App() {
           candidates: [],
         },
       ]);
-      showToast("SQL INSERT SUCCESS: Created new structured election with positions and candidate photos.");
+      showToast("Created new structured election with positions.");
     } catch (err: any) {
-      showToast(`SQL INSERT FAIL: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Creation error: ${err.message}`);
     }
   };
 
@@ -1041,28 +1049,33 @@ export default function App() {
     id: string,
     status: "draft" | "active" | "completed",
   ) => {
+    // Targeted optimistic update
+    setElections((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, status } : e)),
+    );
+    showToast(`Election status updated to "${status}".`);
+
     try {
-      setAppLoading(true);
       await dbService.updateElection(id, { status });
-      await refreshDatabaseState();
-      showToast(`SQL UPDATE SUCCESS: Election status updated to "${status}".`);
+      refreshDatabaseState("elections", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Error updating status: ${err.message}`);
+      refreshDatabaseState("elections", true);
     }
   };
 
   const handleDeleteElection = async (id: string) => {
+    // Targeted optimistic update
+    setElections((prev) => prev.filter((e) => e.id !== id));
+    showToast("Election deleted successfully.");
+
     try {
-      setAppLoading(true);
       await dbService.deleteElection(id);
-      await refreshDatabaseState();
-      showToast("SQL DELETE SUCCESS: Election sheet deleted permanently.");
+      refreshDatabaseState("elections", true);
+      refreshDatabaseState("votes", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Error deleting election: ${err.message}`);
+      refreshDatabaseState("elections", true);
     }
   };
 
@@ -1108,12 +1121,18 @@ export default function App() {
       );
 
       await dbService.updateElection(electionId, { status: "completed" });
-      await refreshDatabaseState();
-      showToast(
-        `SQL SIMULATION: Distributed random ballot entries across all positions to active voter base.`,
+      setElections((prev) =>
+        prev.map((e) =>
+          e.id === electionId ? { ...e, status: "completed" } : e,
+        ),
       );
+      showToast(
+        "Distributed random ballot entries across all positions to active voter base.",
+      );
+      refreshDatabaseState("elections", true);
+      refreshDatabaseState("votes", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
+      showToast(`Simulation error: ${err.message}`);
     } finally {
       setAppLoading(false);
     }
@@ -1124,82 +1143,90 @@ export default function App() {
     if (!newVoterUsername.trim()) return;
 
     try {
-      setAppLoading(true);
-      await dbService.insertVoter(
+      const newVoter = await dbService.insertVoter(
         newVoterUsername.trim(),
         newVoterPassword.trim() || "Pass123",
         newVoterRole as any,
       );
-      await refreshDatabaseState();
+      setVoters((prev) => [newVoter, ...prev]);
+      refreshDatabaseState("voters", true);
 
       setNewVoterUsername("");
       setNewVoterPassword("");
       showToast(
-        `SQL INSERT SUCCESS: Created ${newVoterRole === "club_manager" ? "Club Manager" : "Voter"} account.`,
+        `Created ${newVoterRole === "club_manager" ? "Club Manager" : "Voter"} account.`,
       );
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Account creation error: ${err.message}`);
     }
   };
 
   const toggleVoterRole = async (v: VoterRow) => {
     const nextRole = v.role === "club_manager" ? "voter" : "club_manager";
+    // Targeted optimistic update
+    setVoters((prev) =>
+      prev.map((voter) =>
+        voter.id === v.id ? { ...voter, role: nextRole } : voter,
+      ),
+    );
+    showToast(`Changed "${v.username}" to ${nextRole === "club_manager" ? "Club Manager" : "Voter"}.`);
+
     try {
-      setAppLoading(true);
       await dbService.updateVoter(v.id, { role: nextRole });
-      await refreshDatabaseState();
-      showToast(
-        `SQL UPDATE SUCCESS: Changed "${v.username}" to ${nextRole === "club_manager" ? "Club Manager" : "Voter"}.`,
-      );
+      refreshDatabaseState("voters", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Error updating role: ${err.message}`);
+      refreshDatabaseState("voters", true);
     }
   };
 
   const toggleBlockVoter = async (v: VoterRow) => {
+    const nextBlocked = !v.is_blocked;
+    // Targeted optimistic update
+    setVoters((prev) =>
+      prev.map((voter) =>
+        voter.id === v.id ? { ...voter, is_blocked: nextBlocked } : voter,
+      ),
+    );
+    showToast(`${nextBlocked ? "Blocked" : "Unblocked"} voter "${v.username}".`);
+
     try {
-      setAppLoading(true);
-      await dbService.updateVoter(v.id, { is_blocked: !v.is_blocked });
-      await refreshDatabaseState();
-      showToast(
-        `SQL UPDATE SUCCESS: ${v.is_blocked ? "Unblocked" : "Blocked"} voter "${v.username}".`,
-      );
+      await dbService.updateVoter(v.id, { is_blocked: nextBlocked });
+      refreshDatabaseState("voters", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Error updating status: ${err.message}`);
+      refreshDatabaseState("voters", true);
     }
   };
 
   const handleDeleteVoter = async (id: string) => {
+    // Targeted optimistic update
+    setVoters((prev) => prev.filter((voter) => voter.id !== id));
+    showToast("Voter account removed.");
+
     try {
-      setAppLoading(true);
       await dbService.deleteVoter(id);
-      await refreshDatabaseState();
-      showToast("SQL DELETE SUCCESS: Account credentials deleted permanently.");
+      refreshDatabaseState("voters", true);
+      refreshDatabaseState("votes", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Error deleting account: ${err.message}`);
+      refreshDatabaseState("voters", true);
     }
   };
 
   const togglePublishResults = async (id: string, published: boolean) => {
+    // Targeted optimistic update
+    setElections((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, published } : e)),
+    );
+    showToast(`Feed visibility changed to ${published ? "Visible" : "Hidden"}.`);
+
     try {
-      setAppLoading(true);
       await dbService.updateElection(id, { published });
-      await refreshDatabaseState();
-      showToast(
-        `SQL UPDATE SUCCESS: Feed visibility changed to ${published ? "Visible" : "Hidden"}.`,
-      );
+      refreshDatabaseState("elections", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Error updating visibility: ${err.message}`);
+      refreshDatabaseState("elections", true);
     }
   };
 
@@ -1212,37 +1239,34 @@ export default function App() {
     }
 
     try {
-      setAppLoading(true);
-      await dbService.insertClub(
+      const newClub = await dbService.insertClub(
         newClubName.trim(),
         newClubDesc.trim() || "No description provided.",
         newClubManagerId,
       );
-      await refreshDatabaseState();
+      setClubs((prev) => [newClub, ...prev]);
+      refreshDatabaseState("clubs", true);
 
       setNewClubName("");
       setNewClubDesc("");
       setNewClubManagerId("");
-      showToast(
-        `SQL INSERT SUCCESS: New club "${newClubName}" created successfully.`,
-      );
+      showToast(`New club "${newClub.name}" created successfully.`);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Error creating club: ${err.message}`);
     }
   };
 
   const handleDeleteClub = async (id: string) => {
+    // Targeted optimistic update
+    setClubs((prev) => prev.filter((c) => c.id !== id));
+    showToast("Club removed.");
+
     try {
-      setAppLoading(true);
       await dbService.deleteClub(id);
-      await refreshDatabaseState();
-      showToast("SQL DELETE SUCCESS: Club page deleted permanently.");
+      refreshDatabaseState("clubs", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Error deleting club: ${err.message}`);
+      refreshDatabaseState("clubs", true);
     }
   };
 
@@ -1254,15 +1278,24 @@ export default function App() {
       ? existingIds.filter((id) => id !== voterId)
       : [...existingIds, voterId];
 
+    // Targeted optimistic update
+    setClubMembers((prev) => {
+      const others = prev.filter((cm) => cm.club_id !== clubId);
+      const newMembers = updatedIds.map((vId) => ({
+        id: `cm_${clubId}_${vId}`,
+        club_id: clubId,
+        voter_id: vId,
+      }));
+      return [...others, ...newMembers];
+    });
+    showToast("Club roster updated.");
+
     try {
-      setAppLoading(true);
       await dbService.setClubMembers(clubId, updatedIds);
-      showToast("SQL TRANSACTION SUCCESS: Club roster updated.");
-      await refreshDatabaseState();
+      refreshDatabaseState("clubs", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Error updating roster: ${err.message}`);
+      refreshDatabaseState("clubs", true);
     }
   };
 
@@ -1272,32 +1305,31 @@ export default function App() {
     if (!newUpdateContent.trim() && !mediaUrl) return;
 
     try {
-      setAppLoading(true);
-      await dbService.insertUpdate(
+      const newUpd = await dbService.insertUpdate(
         newUpdateContent.trim(),
         "Administrator",
         mediaUrl,
       );
-      await refreshDatabaseState();
+      setUpdates((prev) => [newUpd, ...prev]);
       setNewUpdateContent("");
-      showToast("SQL BROADCAST SUCCESS: Verified update broadcasted globally.");
+      showToast("Update broadcasted successfully.");
+      refreshDatabaseState("updates", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Error broadcasting update: ${err.message}`);
     }
   };
 
   const handleDeleteUpdate = async (id: string) => {
+    // Targeted optimistic update
+    setUpdates((prev) => prev.filter((u) => u.id !== id));
+    showToast("Broadcast update deleted.");
+
     try {
-      setAppLoading(true);
       await dbService.deleteUpdate(id);
-      await refreshDatabaseState();
-      showToast("SQL DELETE SUCCESS: Broadcast update deleted permanently.");
+      refreshDatabaseState("updates", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
-    } finally {
-      setAppLoading(false);
+      showToast(`Error deleting update: ${err.message}`);
+      refreshDatabaseState("updates", true);
     }
   };
 
@@ -1309,9 +1341,9 @@ export default function App() {
         currentUser.id,
         currentUser.username,
       );
-      await refreshDatabaseState();
+      refreshDatabaseState("updates", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
+      showToast(`Error: ${err.message}`);
     }
   };
 
@@ -1322,17 +1354,21 @@ export default function App() {
     if (!text.trim()) return;
 
     try {
-      await dbService.insertUpdateComment(
+      const newComment = await dbService.insertUpdateComment(
         updateId,
         currentUser.id,
         currentUser.username,
         text.trim(),
       );
       setNewCommentContents((prev) => ({ ...prev, [updateId]: "" }));
-      await refreshDatabaseState();
-      showToast("SQL COMMENT SUCCESS: Comment post row added.");
+      setUpdateComments((prev) => ({
+        ...prev,
+        [updateId]: [...(prev[updateId] || []), newComment],
+      }));
+      showToast("Comment posted.");
+      refreshDatabaseState("updates", true);
     } catch (err: any) {
-      showToast(`SQL ERROR: ${err.message}`);
+      showToast(`Comment error: ${err.message}`);
     }
   };
 
@@ -2482,6 +2518,12 @@ export default function App() {
                     refreshDatabaseState={refreshDatabaseState}
                     showToast={showToast}
                     setIsLoading={setAppLoading}
+                    setElections={setElections}
+                    setVoters={setVoters}
+                    setStudents={setStudents}
+                    setClubs={setClubs}
+                    setClubMembers={setClubMembers}
+                    setUpdates={setUpdates}
                   />
                 ) : currentUser.role === "club_manager" ? (
                   /* ================== ROUTED CLUB MANAGER PORTAL ================== */
