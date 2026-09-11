@@ -1975,7 +1975,7 @@ export default function App() {
                         fill="#EA4335"
                       />
                     </svg>
-                    <span>Sign In with @cunima.ac.mw Google</span>
+                    <span>Click me to login</span>
                   </button>
 
                   {!showCredentialsForm && (
