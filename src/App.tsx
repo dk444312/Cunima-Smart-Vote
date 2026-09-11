@@ -40,6 +40,7 @@ import {
   getElectionPositions,
   getLocalCache,
   CACHE_KEYS,
+  invalidateDBCache,
   PREMADE_ADMIN,
   PREMADE_VOTER,
   PREMADE_MANAGER,
@@ -355,8 +356,19 @@ export default function App() {
 
   // Instant non-blocking initialization on mount (No splash delays, no screen lock)
   useEffect(() => {
-    initializeDatabase().catch(() => {});
-    refreshDatabaseState().catch(() => {});
+    const init = async () => {
+      try {
+        await initializeDatabase();
+      } catch (e) {
+        console.warn("Init DB error:", e);
+      }
+      try {
+        await refreshDatabaseState();
+      } catch (e) {
+        console.warn("Refresh DB error:", e);
+      }
+    };
+    init();
   }, []);
 
   // Lazy load data on-demand as user navigates to specific tabs
@@ -520,7 +532,7 @@ export default function App() {
   };
 
   // Auth Operations
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
     setUnregisteredUsernamePrompt(null);
@@ -548,88 +560,111 @@ export default function App() {
       return;
     }
 
-    // Check seed / registered voters table
-    const matchedVoter = voters.find(
-      (v) => v.username.toLowerCase() === user.toLowerCase(),
-    );
+    setIsLoading(true);
+    try {
+      invalidateDBCache("voters");
+      invalidateDBCache("students");
+      
+      const [freshVoters, freshStudents] = await Promise.all([
+        dbService.getVoters(),
+        dbService.getStudents()
+      ]);
+      
+      setVoters(freshVoters);
+      setStudents(freshStudents);
 
-    if (matchedVoter) {
-      if (matchedVoter.password === pass) {
-        if (matchedVoter.is_blocked) {
-          setLoginError(
-            "This user account has been blocked by administrators.",
+      // Check seed / registered voters table
+      const matchedVoter = freshVoters.find(
+        (v) => v.username.toLowerCase() === user.toLowerCase(),
+      );
+
+      if (matchedVoter) {
+        if (matchedVoter.password === pass) {
+          if (matchedVoter.is_blocked) {
+            setLoginError(
+              "This user account has been blocked by administrators.",
+            );
+            setIsLoading(false);
+            return;
+          }
+
+          // Admin accounts do not need student registry linkage
+          if (matchedVoter.role === "admin") {
+            const adminUser = {
+              id: matchedVoter.id,
+              username: matchedVoter.username,
+              role: "admin" as const,
+            };
+            setCurrentUser(adminUser);
+            localStorage.setItem(
+              "g_election_active_user",
+              JSON.stringify(adminUser),
+            );
+            setUsernameInput("");
+            setPasswordInput("");
+            showToast("Access Granted: Welcome back, Administrator.");
+            setIsLoading(false);
+            return;
+          }
+
+          // Check if student profile is connected in CampusVote student directory!
+          const matchedStudent = findMatchingStudent(
+            matchedVoter.username,
+            freshStudents,
           );
-          return;
-        }
 
-        // Admin accounts do not need student registry linkage
-        if (matchedVoter.role === "admin") {
-          const adminUser = {
+          if (!matchedStudent) {
+            // Account credentials verified, but student record is NOT connected!
+            // Show the student submission form!
+            openSubmissionForm(
+              matchedVoter.username,
+              "credentials",
+              "Account credentials verified, but your student record is not yet connected in the database. Please submit your registration details to the administrator.",
+            );
+            showToast(
+              "Account verified, but not connected to a student record. Please submit your details.",
+            );
+            setIsLoading(false);
+            return;
+          }
+
+          if (matchedStudent.status === "pending") {
+            setLoginError(
+              "Your student registration application is currently pending administrator approval. Please wait for approval before accessing ballots.",
+            );
+            setIsLoading(false);
+            return;
+          }
+
+          const voterUser = {
             id: matchedVoter.id,
             username: matchedVoter.username,
-            role: "admin" as const,
+            role: matchedVoter.role || "voter",
           };
-          setCurrentUser(adminUser);
+          setCurrentUser(voterUser);
           localStorage.setItem(
             "g_election_active_user",
-            JSON.stringify(adminUser),
+            JSON.stringify(voterUser),
           );
           setUsernameInput("");
           setPasswordInput("");
-          showToast("Access Granted: Welcome back, Administrator.");
-          return;
-        }
-
-        // Check if student profile is connected in CampusVote student directory!
-        const matchedStudent = findMatchingStudent(
-          matchedVoter.username,
-          students,
-        );
-
-        if (!matchedStudent) {
-          // Account credentials verified, but student record is NOT connected!
-          // Show the student submission form!
-          openSubmissionForm(
-            matchedVoter.username,
-            "credentials",
-            "Account credentials verified, but your student record is not yet connected in the database. Please submit your registration details to the administrator.",
-          );
-          showToast(
-            "Account verified, but not connected to a student record. Please submit your details.",
-          );
-          return;
-        }
-
-        if (matchedStudent.status === "pending") {
+          showToast(`Access Granted: Welcome back, ${voterUser.username}.`);
+        } else {
           setLoginError(
-            "Your student registration application is currently pending administrator approval. Please wait for approval before accessing ballots.",
+            "Incorrect credentials. Please login with Google or contact the Electoral Commission for support.",
           );
-          return;
         }
-
-        const voterUser = {
-          id: matchedVoter.id,
-          username: matchedVoter.username,
-          role: matchedVoter.role || "voter",
-        };
-        setCurrentUser(voterUser);
-        localStorage.setItem(
-          "g_election_active_user",
-          JSON.stringify(voterUser),
-        );
-        setUsernameInput("");
-        setPasswordInput("");
-        showToast(`Access Granted: Welcome back, ${voterUser.username}.`);
       } else {
         setLoginError(
           "Incorrect credentials. Please login with Google or contact the Electoral Commission for support.",
         );
+        setUnregisteredUsernamePrompt(user);
       }
-    } else {
-      setLoginError(
-        "Incorrect credentials. Please login with Google or contact the Electoral Commission for support.",
-      );
-      setUnregisteredUsernamePrompt(user);
+    } catch (err) {
+      console.error("Login verification failed:", err);
+      setLoginError("Could not verify credentials due to a database error.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -660,6 +695,17 @@ export default function App() {
         return;
       }
 
+      invalidateDBCache("voters");
+      invalidateDBCache("students");
+      
+      const [freshVoters, freshStudents] = await Promise.all([
+        dbService.getVoters(),
+        dbService.getStudents()
+      ]);
+      
+      setVoters(freshVoters);
+      setStudents(freshStudents);
+
       // Check if user is the administrator bypass
       const isAdminEmail =
         email.toLowerCase() === "admin@cunima.ac.mw" ||
@@ -667,7 +713,7 @@ export default function App() {
 
       if (isAdminEmail) {
         // Find or create admin voter row
-        let matchedVoter = voters.find(
+        let matchedVoter = freshVoters.find(
           (v) => v.username.toLowerCase() === email.toLowerCase(),
         );
         if (!matchedVoter) {
@@ -715,7 +761,7 @@ export default function App() {
       await new Promise((resolve) => setTimeout(resolve, 900));
 
       // Check Student Register Database: Check full name and the email address name
-      const matchedStudent = students.find((s) => {
+      const matchedStudent = freshStudents.find((s) => {
         // 1. Direct Email Match
         if (s.email?.toLowerCase().trim() === email.toLowerCase().trim()) {
           return true;
@@ -788,7 +834,7 @@ export default function App() {
         }
 
         // Student exists and is APPROVED! Let's connect them
-        let matchedVoter = voters.find(
+        let matchedVoter = freshVoters.find(
           (v) => v.username.toLowerCase() === email.toLowerCase(),
         );
         if (!matchedVoter) {
