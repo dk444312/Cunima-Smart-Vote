@@ -56,16 +56,31 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-// LocalStorage Keys for simulation fallback
-const ELECTIONS_KEY = "g_election_elections_table";
-const VOTERS_KEY = "g_election_voters_table";
-const VOTES_KEY = "g_election_votes_table";
-const UPDATES_KEY = "g_election_updates_table";
-const UPDATE_LIKES_KEY = "g_election_update_likes_table";
-const UPDATE_COMMENTS_KEY = "g_election_update_comments_table";
-const CLUBS_KEY = "g_election_clubs_table";
-const CLUB_MEMBERS_KEY = "g_election_club_members_table";
-const STUDENTS_KEY = "g_election_students_table";
+// LocalStorage Keys for simulation fallback and local persistence
+export const ELECTIONS_KEY = "g_election_elections_table";
+export const VOTERS_KEY = "g_election_voters_table";
+export const VOTES_KEY = "g_election_votes_table";
+export const UPDATES_KEY = "g_election_updates_table";
+export const UPDATE_LIKES_KEY = "g_election_update_likes_table";
+export const UPDATE_COMMENTS_KEY = "g_election_update_comments_table";
+export const CLUBS_KEY = "g_election_clubs_table";
+export const CLUB_MEMBERS_KEY = "g_election_club_members_table";
+export const STUDENTS_KEY = "g_election_students_table";
+
+// Helper to strip sensitive credentials before saving to public device storage
+export function sanitizeVoter<T extends Partial<VoterRow>>(voter: T): T {
+  if (!voter) return voter;
+  const { password, ...safe } = voter as any;
+  return safe as T;
+}
+
+export function sanitizeVoters(votersList: VoterRow[]): VoterRow[] {
+  if (!Array.isArray(votersList)) return [];
+  return votersList.map((v) => {
+    const { password, ...safe } = v;
+    return safe as VoterRow;
+  });
+}
 
 // Live concurrent read caching to handle peak loads (prevents hammering Supabase when multiple active voters query the system)
 const CACHE_TTL_MS = 2500; // 2.5 seconds cache time is perfect: provides extreme UI responsiveness and saves server limits
@@ -93,14 +108,22 @@ export function invalidateDBCache(): void {
   }
 }
 
-// Helper to get local storage tables
-function getLocalTable<T>(key: string): T[] {
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : [];
+// Helper to get local storage tables with fallback
+export function getLocalTable<T>(key: string, fallback: T[] = []): T[] {
+  try {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
-function saveLocalTable<T>(key: string, data: T[]): void {
-  localStorage.setItem(key, JSON.stringify(data));
+export function saveLocalTable<T>(key: string, data: T[]): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (err) {
+    console.warn(`Could not save table "${key}" to localStorage:`, err);
+  }
 }
 
 // Premade users for fallback / initialization
@@ -561,17 +584,15 @@ export const dbService = {
 
     const localVotes = getLocalTable<VoteRow>(VOTES_KEY);
     for (const nv of newVotes) {
-      if (
-        localVotes.some(
-          (v) =>
-            v.voter_id === nv.voter_id &&
-            v.election_id === nv.election_id &&
-            (v.position_id || "general") === (nv.position_id || "general"),
-        )
-      ) {
-        throw new Error("You have already cast a vote for this position.");
+      const alreadyExists = localVotes.some(
+        (v) =>
+          v.voter_id === nv.voter_id &&
+          v.election_id === nv.election_id &&
+          (v.position_id || "general") === (nv.position_id || "general"),
+      );
+      if (!alreadyExists) {
+        localVotes.push(nv);
       }
-      localVotes.push(nv);
     }
     saveLocalTable(VOTES_KEY, localVotes);
     return newVotes;

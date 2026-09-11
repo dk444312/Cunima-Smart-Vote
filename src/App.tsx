@@ -41,6 +41,18 @@ import {
   PREMADE_ADMIN,
   PREMADE_VOTER,
   PREMADE_MANAGER,
+  ELECTIONS_KEY,
+  VOTERS_KEY,
+  VOTES_KEY,
+  CLUBS_KEY,
+  CLUB_MEMBERS_KEY,
+  UPDATES_KEY,
+  UPDATE_LIKES_KEY,
+  UPDATE_COMMENTS_KEY,
+  STUDENTS_KEY,
+  getLocalTable,
+  saveLocalTable,
+  sanitizeVoters,
 } from "./lib/supabase.ts";
 import {
   ElectionRow,
@@ -84,20 +96,48 @@ export default function App() {
   const [showCredentialsForm, setShowCredentialsForm] = useState(false);
   const [showCredentialsWarningModal, setShowCredentialsWarningModal] = useState(false);
 
-  // Database State Mirrors
-  const [elections, setElections] = useState<ElectionRow[]>([]);
-  const [voters, setVoters] = useState<VoterRow[]>([]);
-  const [votes, setVotes] = useState<VoteRow[]>([]);
-  const [clubs, setClubs] = useState<ClubRow[]>([]);
-  const [clubMembers, setClubMembers] = useState<ClubMemberRow[]>([]);
-  const [updates, setUpdates] = useState<UpdateRow[]>([]);
+  // Database State Mirrors initialized immediately from localStorage (instant display, no flash)
+  const [elections, setElections] = useState<ElectionRow[]>(() =>
+    getLocalTable<ElectionRow>(ELECTIONS_KEY, []),
+  );
+  const [voters, setVoters] = useState<VoterRow[]>(() =>
+    getLocalTable<VoterRow>(VOTERS_KEY, []),
+  );
+  const [votes, setVotes] = useState<VoteRow[]>(() =>
+    getLocalTable<VoteRow>(VOTES_KEY, []),
+  );
+  const [clubs, setClubs] = useState<ClubRow[]>(() =>
+    getLocalTable<ClubRow>(CLUBS_KEY, []),
+  );
+  const [clubMembers, setClubMembers] = useState<ClubMemberRow[]>(() =>
+    getLocalTable<ClubMemberRow>(CLUB_MEMBERS_KEY, []),
+  );
+  const [updates, setUpdates] = useState<UpdateRow[]>(() =>
+    getLocalTable<UpdateRow>(UPDATES_KEY, []),
+  );
   const [updateLikes, setUpdateLikes] = useState<
     Record<string, UpdateLikeRow[]>
-  >({});
+  >(() => {
+    try {
+      const saved = localStorage.getItem(UPDATE_LIKES_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [updateComments, setUpdateComments] = useState<
     Record<string, UpdateCommentRow[]>
-  >({});
-  const [students, setStudents] = useState<StudentRow[]>([]);
+  >(() => {
+    try {
+      const saved = localStorage.getItem(UPDATE_COMMENTS_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [students, setStudents] = useState<StudentRow[]>(() =>
+    getLocalTable<StudentRow>(STUDENTS_KEY, []),
+  );
   // Only true during initial boot before user login
   const [isLoading, setIsLoading] = useState(() => {
     try {
@@ -200,11 +240,129 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  // Modular refresh functions - loads data strictly based on what the page needs and caches locally
+  const refreshElectionsAndVotes = async () => {
+    try {
+      const [fetchedElections, fetchedVotes] = await Promise.all([
+        dbService.getElections(),
+        dbService.getVotes(),
+      ]);
+      setElections(fetchedElections);
+      setVotes(fetchedVotes);
+      saveLocalTable(ELECTIONS_KEY, fetchedElections);
+      saveLocalTable(VOTES_KEY, fetchedVotes);
+    } catch (e) {
+      console.warn("Background refresh elections/votes error:", e);
+    }
+  };
+
+  const refreshStudents = async () => {
+    try {
+      const fetchedStudents = await dbService.getStudents();
+      setStudents(fetchedStudents);
+      saveLocalTable(STUDENTS_KEY, fetchedStudents);
+    } catch (e) {
+      console.warn("Background refresh students error:", e);
+    }
+  };
+
+  const refreshVoters = async () => {
+    try {
+      const fetchedVoters = await dbService.getVoters();
+      setVoters(fetchedVoters);
+      // Credentials (passwords) are excluded from user local storage for security
+      const safeVoters = sanitizeVoters(fetchedVoters);
+      saveLocalTable(VOTERS_KEY, safeVoters);
+    } catch (e) {
+      console.warn("Background refresh voters error:", e);
+    }
+  };
+
+  const refreshClubs = async () => {
+    try {
+      const [fetchedClubs, fetchedClubMembers] = await Promise.all([
+        dbService.getClubs(),
+        dbService.getClubMembers(),
+      ]);
+      setClubs(fetchedClubs);
+      setClubMembers(fetchedClubMembers);
+      saveLocalTable(CLUBS_KEY, fetchedClubs);
+      saveLocalTable(CLUB_MEMBERS_KEY, fetchedClubMembers);
+    } catch (e) {
+      console.warn("Background refresh clubs error:", e);
+    }
+  };
+
+  const refreshUpdates = async () => {
+    try {
+      const fetchedUpdates = await dbService.getUpdates();
+      setUpdates(fetchedUpdates);
+      saveLocalTable(UPDATES_KEY, fetchedUpdates);
+
+      const likesMap: Record<string, UpdateLikeRow[]> = {};
+      const commentsMap: Record<string, UpdateCommentRow[]> = {};
+      await Promise.all(
+        fetchedUpdates.map(async (upd) => {
+          const [likes, comments] = await Promise.all([
+            dbService.getUpdateLikes(upd.id),
+            dbService.getUpdateComments(upd.id),
+          ]);
+          likesMap[upd.id] = likes;
+          commentsMap[upd.id] = comments;
+        }),
+      );
+      setUpdateLikes(likesMap);
+      setUpdateComments(commentsMap);
+      try {
+        localStorage.setItem(UPDATE_LIKES_KEY, JSON.stringify(likesMap));
+        localStorage.setItem(UPDATE_COMMENTS_KEY, JSON.stringify(commentsMap));
+      } catch (e) {}
+    } catch (e) {
+      console.warn("Background refresh updates error:", e);
+    }
+  };
+
+  // Load specifically based on the active page/menu
+  const loadPageData = async (page: string) => {
+    switch (page) {
+      case "election":
+      case "voting":
+      case "results":
+      case "voter_turnout":
+        await refreshElectionsAndVotes();
+        break;
+      case "students":
+      case "student_approval":
+        await refreshStudents();
+        break;
+      case "voters":
+      case "roles":
+      case "guard":
+        await refreshVoters();
+        break;
+      case "clubs":
+      case "club_elections":
+        await refreshClubs();
+        break;
+      case "home":
+      case "updates":
+        await refreshUpdates();
+        break;
+      default:
+        refreshElectionsAndVotes();
+        break;
+    }
+  };
+
   // Sync state with database
   const refreshDatabaseState = async () => {
     try {
       if (!currentUser) {
         setIsLoading(true);
+      }
+      if (currentUser) {
+        await loadPageData(activeMenu);
+        return;
       }
       const [
         allElections,
@@ -232,6 +390,15 @@ export default function App() {
       setUpdates(allUpdates);
       setStudents(allStudents);
 
+      saveLocalTable(ELECTIONS_KEY, allElections);
+      saveLocalTable(VOTES_KEY, allVotes);
+      saveLocalTable(CLUBS_KEY, allClubs);
+      saveLocalTable(CLUB_MEMBERS_KEY, allClubMembers);
+      saveLocalTable(UPDATES_KEY, allUpdates);
+      saveLocalTable(STUDENTS_KEY, allStudents);
+      const safeVoters = sanitizeVoters(allVoters);
+      saveLocalTable(VOTERS_KEY, safeVoters);
+
       // Fetch social details in parallel for each update
       const likesMap: Record<string, UpdateLikeRow[]> = {};
       const commentsMap: Record<string, UpdateCommentRow[]> = {};
@@ -249,6 +416,10 @@ export default function App() {
 
       setUpdateLikes(likesMap);
       setUpdateComments(commentsMap);
+      try {
+        localStorage.setItem(UPDATE_LIKES_KEY, JSON.stringify(likesMap));
+        localStorage.setItem(UPDATE_COMMENTS_KEY, JSON.stringify(commentsMap));
+      } catch (e) {}
     } catch (err: any) {
       console.error("Database connection refresh delay or error:", err);
       showToast(
@@ -266,8 +437,8 @@ export default function App() {
       const hasSeenSplash = localStorage.getItem("has_seen_octopas_splash");
       if (!hasSeenSplash) {
         setShowOctopasSplash(true);
-        // Show Octopas splash screen for 3 seconds first
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        // Show Octopas splash screen for 1.2 seconds first
+        await new Promise((resolve) => setTimeout(resolve, 1200));
         setShowOctopasSplash(false);
         localStorage.setItem("has_seen_octopas_splash", "true");
       }
@@ -288,6 +459,13 @@ export default function App() {
       }
     }
   }, [currentUser]);
+
+  // Load data based on the page user is currently on
+  useEffect(() => {
+    if (currentUser) {
+      loadPageData(activeMenu);
+    }
+  }, [activeMenu, currentUser]);
 
   // Sync Dark Mode Class on Document Body
   useEffect(() => {
@@ -584,23 +762,12 @@ export default function App() {
         return;
       }
 
-      // Trigger Searching UI
+      // Quick Searching UI
       setIsSearchingProfile(true);
       setCurrentUserDisplay(displayName);
       setSearchStateMessage(
-        "Establishing secure connection to CampusVote Database...",
+        "Scanning student registry...",
       );
-      await new Promise((resolve) => setTimeout(resolve, 700));
-
-      setSearchStateMessage(
-        `Parsing name structures from authenticated email "${email}"...`,
-      );
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      setSearchStateMessage(
-        "Scanning student registry columns for bi-directional similarities...",
-      );
-      await new Promise((resolve) => setTimeout(resolve, 900));
 
       // Check Student Register Database: Check full name and the email address name
       const matchedStudent = students.find((s) => {
@@ -645,11 +812,6 @@ export default function App() {
       });
 
       if (matchedStudent) {
-        setSearchStateMessage(
-          `Match Identified! Connecting to student profile of "${matchedStudent.first_name} ${matchedStudent.surname}" [${matchedStudent.registration_number}]...`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, 900));
-
         // Automatically save their Google email to their student record if it's not set
         if (
           !matchedStudent.email ||
@@ -657,7 +819,7 @@ export default function App() {
         ) {
           try {
             await dbService.linkStudentEmail(matchedStudent.id, email);
-            await refreshDatabaseState();
+            refreshStudents();
           } catch (linkErr) {
             console.error(
               "Auto linking Google email to student profile failed:",
@@ -687,7 +849,7 @@ export default function App() {
               "firebase_secret",
               "voter",
             );
-            await refreshDatabaseState();
+            refreshVoters();
           } catch (dbErr) {
             console.error("Auto registration voter failed:", dbErr);
           }
@@ -715,10 +877,6 @@ export default function App() {
         });
         showToast("Profile Match Identified: Please confirm your identity.");
       } else {
-        setSearchStateMessage(
-          "No matching student profile found in standard directory database. Redirecting to registration...",
-        );
-        await new Promise((resolve) => setTimeout(resolve, 1000));
         // NOT in database at all! Trigger Student Profile Registration form!
         setPendingGoogleUser({ email, displayName, uid: user.uid });
         showToast(
@@ -777,7 +935,7 @@ export default function App() {
       setRegGender("M");
 
       // Sync the states
-      await refreshDatabaseState();
+      await refreshStudents();
       setGoogleRegSuccess(true);
       showToast(
         "Your registration profile has been successfully submitted for administrator approval.",
@@ -852,7 +1010,7 @@ export default function App() {
         "draft",
         validPositions,
       );
-      await refreshDatabaseState();
+      await refreshElectionsAndVotes();
 
       setNewElectionTitle("");
       setNewElectionDesc("");
@@ -886,7 +1044,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.updateElection(id, { status });
-      await refreshDatabaseState();
+      await refreshElectionsAndVotes();
       showToast(`SQL UPDATE SUCCESS: Election status updated to "${status}".`);
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -899,7 +1057,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.deleteElection(id);
-      await refreshDatabaseState();
+      await refreshElectionsAndVotes();
       showToast("SQL DELETE SUCCESS: Election sheet deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -950,7 +1108,7 @@ export default function App() {
       );
 
       await dbService.updateElection(electionId, { status: "completed" });
-      await refreshDatabaseState();
+      await refreshElectionsAndVotes();
       showToast(
         `SQL SIMULATION: Distributed random ballot entries across all positions to active voter base.`,
       );
@@ -972,7 +1130,7 @@ export default function App() {
         newVoterPassword.trim() || "Pass123",
         newVoterRole as any,
       );
-      await refreshDatabaseState();
+      await refreshVoters();
 
       setNewVoterUsername("");
       setNewVoterPassword("");
@@ -991,7 +1149,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.updateVoter(v.id, { role: nextRole });
-      await refreshDatabaseState();
+      await refreshVoters();
       showToast(
         `SQL UPDATE SUCCESS: Changed "${v.username}" to ${nextRole === "club_manager" ? "Club Manager" : "Voter"}.`,
       );
@@ -1006,7 +1164,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.updateVoter(v.id, { is_blocked: !v.is_blocked });
-      await refreshDatabaseState();
+      await refreshVoters();
       showToast(
         `SQL UPDATE SUCCESS: ${v.is_blocked ? "Unblocked" : "Blocked"} voter "${v.username}".`,
       );
@@ -1021,7 +1179,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.deleteVoter(id);
-      await refreshDatabaseState();
+      await refreshVoters();
       showToast("SQL DELETE SUCCESS: Account credentials deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -1034,7 +1192,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.updateElection(id, { published });
-      await refreshDatabaseState();
+      await refreshElectionsAndVotes();
       showToast(
         `SQL UPDATE SUCCESS: Feed visibility changed to ${published ? "Visible" : "Hidden"}.`,
       );
@@ -1060,7 +1218,7 @@ export default function App() {
         newClubDesc.trim() || "No description provided.",
         newClubManagerId,
       );
-      await refreshDatabaseState();
+      await refreshClubs();
 
       setNewClubName("");
       setNewClubDesc("");
@@ -1079,7 +1237,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.deleteClub(id);
-      await refreshDatabaseState();
+      await refreshClubs();
       showToast("SQL DELETE SUCCESS: Club page deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -1100,7 +1258,7 @@ export default function App() {
       setAppLoading(true);
       await dbService.setClubMembers(clubId, updatedIds);
       showToast("SQL TRANSACTION SUCCESS: Club roster updated.");
-      await refreshDatabaseState();
+      await refreshClubs();
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     } finally {
@@ -1120,7 +1278,7 @@ export default function App() {
         "Administrator",
         mediaUrl,
       );
-      await refreshDatabaseState();
+      await refreshUpdates();
       setNewUpdateContent("");
       showToast("SQL BROADCAST SUCCESS: Verified update broadcasted globally.");
     } catch (err: any) {
@@ -1134,7 +1292,7 @@ export default function App() {
     try {
       setAppLoading(true);
       await dbService.deleteUpdate(id);
-      await refreshDatabaseState();
+      await refreshUpdates();
       showToast("SQL DELETE SUCCESS: Broadcast update deleted permanently.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -1151,7 +1309,7 @@ export default function App() {
         currentUser.id,
         currentUser.username,
       );
-      await refreshDatabaseState();
+      await refreshUpdates();
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
     }
@@ -1171,7 +1329,7 @@ export default function App() {
         text.trim(),
       );
       setNewCommentContents((prev) => ({ ...prev, [updateId]: "" }));
-      await refreshDatabaseState();
+      await refreshUpdates();
       showToast("SQL COMMENT SUCCESS: Comment post row added.");
     } catch (err: any) {
       showToast(`SQL ERROR: ${err.message}`);
@@ -2369,6 +2527,13 @@ export default function App() {
                   setIsLoading={setAppLoading}
                   activeTab={activeMenu}
                   onNavigate={(tab) => setActiveMenu(tab)}
+                  onVotesCast={(newVotes) => {
+                    setVotes((prev) => {
+                      const updated = [...prev, ...newVotes];
+                      saveLocalTable(VOTES_KEY, updated);
+                      return updated;
+                    });
+                  }}
                 />
               )}
             </main>
