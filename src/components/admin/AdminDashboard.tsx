@@ -1496,35 +1496,42 @@ export default function AdminDashboard({
                               {candCounts.map(({ cand, count, pct }) => {
                                 const isLeader = maxVotes > 0 && count === maxVotes;
                                 return (
-                                  <div key={cand.id} className="space-y-1">
-                                    <div className="flex justify-between text-xs font-semibold">
-                                      <div className="flex items-center gap-2">
+                                  <div key={cand.id} className="space-y-2 py-1">
+                                    <div className="flex justify-between items-center">
+                                      <div className="flex items-center gap-3">
                                         {cand.photo_url ? (
                                           <img
                                             src={cand.photo_url}
                                             alt={cand.name}
-                                            className="w-5 h-5 rounded-full object-cover border border-zinc-200"
+                                            className="w-8 h-8 rounded-full object-cover border border-zinc-200"
                                             referrerPolicy="no-referrer"
                                           />
                                         ) : (
-                                          <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold text-[9px] flex items-center justify-center">
+                                          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold text-xs flex items-center justify-center">
                                             {cand.name.charAt(0)}
                                           </div>
                                         )}
-                                        <span className="text-zinc-800 dark:text-zinc-200">
-                                          {cand.name}
-                                        </span>
-                                        {isLeader && (
-                                          <span className="text-[9px] bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.2 rounded font-bold">
-                                            Leading
+                                        <div className="flex flex-col">
+                                          <span className="text-slate-900 dark:text-white font-medium text-[15px]">
+                                            {cand.name}
                                           </span>
-                                        )}
+                                          {isLeader && (
+                                            <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 mt-0.5">
+                                              Leading Candidate
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
-                                      <span className="font-mono text-zinc-500 text-[11px]">
-                                        {count} votes ({pct}%)
-                                      </span>
+                                      <div className="flex items-end gap-2">
+                                        <span className="font-extrabold text-slate-900 dark:text-white text-2xl leading-none">
+                                          {count}
+                                        </span>
+                                        <span className="font-semibold text-slate-500 text-[13px] mb-0.5">
+                                          ({pct}%)
+                                        </span>
+                                      </div>
                                     </div>
-                                    <div className="h-2 bg-zinc-200/70 dark:bg-zinc-700 rounded-full overflow-hidden">
+                                    <div className="h-2.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                                       <div
                                         className={`h-full rounded-full transition-all duration-500 ${
                                           isLeader ? "bg-[#1565D8] dark:bg-blue-500" : "bg-zinc-400 dark:bg-zinc-600"

@@ -1336,10 +1336,10 @@ export default function App() {
               />
             </div>
             <div>
-              <h1 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-white">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                 CampusVote
               </h1>
-              <p className="text-[10px] text-zinc-400 font-mono flex items-center gap-1.5">
+              <p className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5">
                 <span
                   className={`inline-block w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
                 />
